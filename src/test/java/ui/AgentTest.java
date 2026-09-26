@@ -26,7 +26,7 @@ public class AgentTest extends BaseUiTest {
                 .open()
                 .verifyAgentOverviewState()
                 .verifyAgentIsEnabled()
-                .verifyAgentIpAddress(AgentSteps.getAgent().getName());
+                .verifyAgentIpAddress(AgentSteps.findAgent().getName());
 
         List<AgentResponse> agentsList = AgentSteps.getAllAgents();
         softly.assertThat(agentsList).isNotEmpty();
@@ -53,6 +53,6 @@ public class AgentTest extends BaseUiTest {
                 .confirmEnable()
                 .verifyAgentIsEnabled();
 
-        AgentSteps.assertAgentReady(AgentSteps.getAgent());
+        AgentSteps.assertAgentReady(AgentSteps.findAgent());
     }
 }

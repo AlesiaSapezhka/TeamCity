@@ -17,7 +17,7 @@ public class EnableAgentExtension implements BeforeEachCallback {
 
         boolean enabled = annotation.enabled();
 
-        AgentResponse agent = AgentSteps.getAgent();
+        AgentResponse agent = AgentSteps.findAgent();
 
         AgentSteps.updateAgentEnabledStatus(
                 agent.getId(),
@@ -25,7 +25,7 @@ public class EnableAgentExtension implements BeforeEachCallback {
                 RandomData.getComment()
         );
 
-        AgentResponse agentAfterChangeStatus = AgentSteps.getAgent();
+        AgentResponse agentAfterChangeStatus = AgentSteps.findAgent();
         if (enabled) {
             AgentSteps.assertAgentReady(agentAfterChangeStatus);
         }

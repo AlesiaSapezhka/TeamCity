@@ -9,6 +9,7 @@ import lombok.*;
 @NoArgsConstructor
 @Builder
 public class AgentEnabledInfoRequest extends BaseModel {
+
     private Boolean status;
     private CommentRequest comment;
 

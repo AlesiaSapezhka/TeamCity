@@ -15,10 +15,16 @@
         <rest-assured.version>6.0.1</rest-assured.version>
         <jackson.version>2.18.2</jackson.version>
         <junit.jupiter.version>5.11.4</junit.jupiter.version>
-        <lombok.version>1.18.46</lombok.version>
+        <excludedGroups></excludedGroups>
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.23.2</version>
+        </dependency>
+
         <dependency>
             <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
@@ -80,10 +86,14 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.2</version>
+                <configuration>
+                    <excludedGroups>${excludedGroups}</excludedGroups>
+                </configuration>
             </plugin>
 
             <plugin>
