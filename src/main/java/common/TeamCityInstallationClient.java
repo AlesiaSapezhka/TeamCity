@@ -29,7 +29,7 @@ public class TeamCityInstallationClient {
         proceedInstallation();
         proceedDatabase();
         acceptLicense();
-        waitForTeamCityReady();
+//        waitForTeamCityReady();
         authenticateSuperUser();
     }
 
