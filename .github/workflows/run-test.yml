@@ -27,7 +27,9 @@ jobs:
         run: docker network create test-network
 
       - name: Start TeamCity Server
-        run: docker run -d --name teamcity-server --network test-network -p 8111:8111 --user 0 -e TEAMCITY_SERVER_OPTS="-Dteamcity.startup.maintenance=false -Dteamcity.auth.userId=admin -Dteamcity.auth.password=SuperToken2026" jetbrains/teamcity-server:latest
+        run: |
+          mkdir -p teamcity_data
+          docker run -d --name teamcity-server --network test-network -p 8111:8111 --user 0 -v ${{ github.workspace }}/teamcity_data:/data/teamcity_server/datadir -e TEAMCITY_SERVER_OPTS="-Dteamcity.startup.maintenance=false -Dteamcity.auth.userId=admin -Dteamcity.auth.password=SuperToken2026" -e TEAMCITY_SERVER_MEM_OPTS="-Xmx1524m -XX:MaxPermSize=256m" jetbrains/teamcity-server:latest
 
       - name: Wait for TeamCity to be ready
         run: |
