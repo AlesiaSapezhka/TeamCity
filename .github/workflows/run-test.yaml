@@ -44,6 +44,12 @@ jobs:
         run: |
           docker compose -f "$COMPOSE_FILE" ps
 
+      # 7. Run TeamCity installation / preconditions
+      - name: Run TeamCity preconditions
+        run: |
+          mvn test \
+            -Dtest=TeamCityInstallationTest
+          
       # 6. Wait until TeamCity is ready
       - name: Wait for TeamCity
         run: |
@@ -67,12 +73,6 @@ jobs:
             docker compose -f "$COMPOSE_FILE" logs --tail 200 teamcity-server
             exit 1
           fi
-
-      # 7. Run TeamCity installation / preconditions
-      - name: Run TeamCity preconditions
-        run: |
-          mvn test \
-            -Dtest=TeamCityInstallationTest
 
       # 8. Run regular tests
       # Preconditions are excluded from the regular test suite
