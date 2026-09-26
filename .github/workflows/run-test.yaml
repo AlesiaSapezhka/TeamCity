@@ -2,49 +2,94 @@ name: TeamCity Tests
 
 on:
   push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+env:
+  COMPOSE_FILE: infrastructure/docker_compose/docker_compose.yml
+  TEAMCITY_URL: http://localhost:8111
 
 jobs:
 
-  setup:
-    name: TeamCity setup
+  test:
     runs-on: ubuntu-latest
 
     steps:
-
-      - name: Checkout
+      # 1. Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 25
+      # 2. Setup Java
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: corretto
           java-version: '21'
           cache: maven
 
-      - name: Clean TeamCity environment
-        run: docker compose down -v --remove-orphans
+      # 3. Clean previous Docker environment
+      - name: Stop previous TeamCity environment
+        run: |
+          docker compose -f "$COMPOSE_FILE" down -v --remove-orphans
 
+      # 4. Start TeamCity
       - name: Start TeamCity
-        run: docker compose up -d
+        run: |
+          docker compose -f "$COMPOSE_FILE" up -d
 
-      - name: Show containers
-        run: docker compose ps
+      # 5. Show containers
+      - name: Check Docker containers
+        run: |
+          docker compose -f "$COMPOSE_FILE" ps
 
+      # 6. Wait until TeamCity is ready
       - name: Wait for TeamCity
         run: |
+          echo "Waiting for TeamCity..."
+
           for i in {1..60}; do
-            if curl -sf http://localhost:8111/healthCheck/ready; then
-              echo "TeamCity is ready"
-              exit 0
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$TEAMCITY_URL/healthCheck/ready" || true)
+
+            echo "Attempt $i: TeamCity status = $STATUS"
+
+            if [ "$STATUS" = "200" ]; then
+              echo "TeamCity is ready!"
+              break
             fi
 
-            echo "Waiting for TeamCity..."
             sleep 5
           done
 
-          echo "TeamCity did not become ready"
-          docker compose logs teamcity-server
-          exit 1
+          if [ "$STATUS" != "200" ]; then
+            echo "TeamCity did not become ready"
+            docker compose -f "$COMPOSE_FILE" logs --tail 200 teamcity-server
+            exit 1
+          fi
 
-      - name: Setup TeamCity
-        run: mvn -B test -Dtest="TeamCityInstallationTest#setUpTeamCity"
+      # 7. Run TeamCity installation / preconditions
+      - name: Run TeamCity preconditions
+        run: |
+          mvn test \
+            -Dtest=TeamCityInstallationTest
+
+      # 8. Run regular tests
+      # Preconditions are excluded from the regular test suite
+      - name: Run tests
+        run: |
+          mvn clean test \
+            -DexcludedGroups=precondition
+
+      # 9. Show TeamCity logs if something failed
+      - name: TeamCity logs
+        if: failure()
+        run: |
+          docker compose -f "$COMPOSE_FILE" logs --tail 300 teamcity-server
+          docker compose -f "$COMPOSE_FILE" logs --tail 300 teamcity-agent
+
+      # 10. Stop Docker environment
+      - name: Stop TeamCity environment
+        if: always()
+        run: |
+          docker compose -f "$COMPOSE_FILE" down -v --remove-orphans
