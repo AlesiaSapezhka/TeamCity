@@ -8,7 +8,7 @@ on:
   pull_request:
 
 env:
-  COMPOSE_FILE: infrastructure/docker_compose/docker_compose.yml
+  COMPOSE_FILE: infrastructure/docker_compose/docker-compose.yml
   TEAMCITY_URL: http://localhost:8111
 
 jobs:
