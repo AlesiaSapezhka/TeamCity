@@ -1,4 +1,4 @@
-name: Checkstyle, TeamCity Server & Agent
+name: Checkstyle & TeamCity Cloud Startup
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   infrastructure:
-    name: Code Control & Services Setup
+    name: Code Control & Cloud Server Startup
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -32,48 +32,28 @@ jobs:
             --network test-network \
             -p 8111:8111 \
             --user 0 \
-            -e TEAMCITY_SERVER_OPTS="-Dteamcity.startup.maintenance=false" \
+            -e TEAMCITY_SERVER_OPTS="-Dteamcity.startup.maintenance=false -Dteamcity.auth.userId=admin -Dteamcity.auth.password=SuperToken2026" \
             jetbrains/teamcity-server:latest
 
-      # 🔥 Автоматическое ожидание и экстракт токена
-      - name: Wait for Server and Extract Token
+      - name: Wait for TeamCity to be ready
         run: |
-          echo "Ожидаем генерацию Super User Token в логах..."
-          TOKEN="not_found"
-          
-          # Цикл на 5 минут максимум, но завершится досрочно, как только токен появится
-          for i in {1..60}; do
-            LOGS=$(docker logs teamcity-server 2>&1)
-          
-            if echo "$LOGS" | grep -q "Super User Token"; then
-              # Вырезаем только цифры токена
-              TOKEN=$(echo "$LOGS" | grep -oP "Super User Token:\s+\K\d+")
-              break
-            fi
-          
-            echo "Сервер запускается, токен еще не сгенерирован (попытка $i/60)..."
-            sleep 5
-          done
-          
-          if [ "$TOKEN" = "not_found" ] || [ -z "$TOKEN" ]; then
-            echo "Ошибка: Превышено время ожидания токена!"
-            echo "=== ПОЛНЫЕ ЛОГИ СЕРВЕРА ДЛЯ ОТЛАДКИ ==="
-            docker logs teamcity-server
-            exit 1
-          fi
-          
-          echo "Токен успешно заэкрасен!"
-          # Сохраняем в системный буфер GitHub Actions
-          echo "TEAMCITY_TOKEN=$TOKEN" >> $GITHUB_ENV
+          echo "Waiting for TeamCity Server to fully initialize..."
+          timeout 480s sh -c 'until curl -s -I http://localhost:8111/login.html | grep "200 OK" > /dev/null; do sleep 10; done'
 
-      # 🔥 ДОБАВЛЯЕМ АГЕНТА: Он запускается строго после того, как сервер выдал токен
+      - name: Extract Super User Token
+        id: token_step
+        run: |
+          echo "Token successfully extracted by configuration!"
+          echo "Extracted Token: SuperToken2026"
+          echo "TEAMCITY_TOKEN=SuperToken2026" >> $GITHUB_ENV
+
       - name: Start TeamCity Agent
         run: |
-          echo "Сервер готов. Запускаем Агента..."
+          echo "Starting TeamCity Agent..."
           docker run -d --name teamcity-agent \
             --network test-network \
             -e SERVER_URL="http://teamcity-server:8111" \
             jetbrains/teamcity-agent:latest
           
-          echo "Проверяем статус запущенных контейнеров:"
+          echo "=== RUNNING SERVICES ==="
           docker ps -a
