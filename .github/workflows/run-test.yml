@@ -27,13 +27,7 @@ jobs:
         run: docker network create test-network
 
       - name: Start TeamCity Server
-        run: |
-          docker run -d --name teamcity-server \
-            --network test-network \
-            -p 8111:8111 \
-            --user 0 \
-            -e TEAMCITY_SERVER_OPTS="-Dteamcity.startup.maintenance=false -Dteamcity.auth.userId=admin -Dteamcity.auth.password=SuperToken2026" \
-            jetbrains/teamcity-server:latest
+        run: docker run -d --name teamcity-server --network test-network -p 8111:8111 --user 0 -e TEAMCITY_SERVER_OPTS="-Dteamcity.startup.maintenance=false -Dteamcity.auth.userId=admin -Dteamcity.auth.password=SuperToken2026" jetbrains/teamcity-server:latest
 
       - name: Wait for TeamCity to be ready
         run: |
@@ -50,10 +44,7 @@ jobs:
       - name: Start TeamCity Agent
         run: |
           echo "Starting TeamCity Agent..."
-          docker run -d --name teamcity-agent \
-            --network test-network \
-            -e SERVER_URL="http://teamcity-server:8111" \
-            jetbrains/teamcity-agent:latest
+          docker run -d --name teamcity-agent --network test-network -e SERVER_URL="http://teamcity-server:8111" jetbrains/teamcity-agent:latest
           
           echo "=== RUNNING SERVICES ==="
           docker ps -a
