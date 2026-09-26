@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class AgentSteps {
 
-    private static final String AGENT_NAME = "teamcity-agent-2";
+    private static final String AGENT_NAME = "teamcity-agent";
 
     public static void ensureAgentReady() {
 

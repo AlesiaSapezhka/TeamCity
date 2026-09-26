@@ -1,95 +1,59 @@
-name: TeamCity Tests
+# 6. Wait until TeamCity HTTP server is available
+- name: Wait for TeamCity server
+  run: |
+    echo "Waiting for TeamCity HTTP server..."
 
-on:
-  push:
-    branches:
-      - main
-      - master
-  pull_request:
+    for i in {1..60}; do
+      STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+        "$TEAMCITY_URL" || true)
 
-env:
-  COMPOSE_FILE: infrastructure/docker_compose/docker-compose.yml
-  TEAMCITY_URL: http://localhost:8111
+      echo "Attempt $i/60: TeamCity HTTP status = $STATUS"
 
-jobs:
+      if [ "$STATUS" != "000" ]; then
+        echo "TeamCity HTTP server is available!"
+        break
+      fi
 
-  test:
-    runs-on: ubuntu-latest
+      sleep 5
+    done
 
-    steps:
-      # 1. Checkout
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    if [ "$STATUS" = "000" ]; then
+      echo "TeamCity HTTP server did not start"
+      docker compose -f "$COMPOSE_FILE" logs --tail 300 teamcity-server
+      exit 1
+    fi
 
-      # 2. Setup Java
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: corretto
-          java-version: '21'
-          cache: maven
+# 7. Run TeamCity installation and preconditions
+- name: Run TeamCity preconditions
+  run: |
+    mvn test -Dtest=TeamCityInstallationTest
 
-      # 3. Clean previous Docker environment
-      - name: Stop previous TeamCity environment
-        run: |
-          docker compose -f "$COMPOSE_FILE" down -v --remove-orphans
+# 8. Verify TeamCity is ready after installation
+- name: Verify TeamCity is ready
+  run: |
+    echo "Waiting for TeamCity to become ready after installation..."
 
-      # 4. Start TeamCity
-      - name: Start TeamCity
-        run: |
-          docker compose -f "$COMPOSE_FILE" up -d
+    for i in {1..60}; do
+      STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+        "$TEAMCITY_URL/healthCheck/ready" || true)
 
-      # 5. Show containers
-      - name: Check Docker containers
-        run: |
-          docker compose -f "$COMPOSE_FILE" ps
+      echo "Attempt $i/60: TeamCity ready status = $STATUS"
 
-      # 7. Run TeamCity installation / preconditions
-      - name: Run TeamCity preconditions
-        run: |
-          mvn test \
-            -Dtest=TeamCityInstallationTest
-          
-      # 6. Wait until TeamCity is ready
-      - name: Wait for TeamCity
-        run: |
-          echo "Waiting for TeamCity..."
+      if [ "$STATUS" = "200" ]; then
+        echo "TeamCity is ready!"
+        break
+      fi
 
-          for i in {1..60}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$TEAMCITY_URL/healthCheck/ready" || true)
+      sleep 5
+    done
 
-            echo "Attempt $i: TeamCity status = $STATUS"
+    if [ "$STATUS" != "200" ]; then
+      echo "TeamCity is still not ready after installation"
+      docker compose -f "$COMPOSE_FILE" logs --tail 300 teamcity-server
+      exit 1
+    fi
 
-            if [ "$STATUS" = "200" ]; then
-              echo "TeamCity is ready!"
-              break
-            fi
-
-            sleep 5
-          done
-
-          if [ "$STATUS" != "200" ]; then
-            echo "TeamCity did not become ready"
-            docker compose -f "$COMPOSE_FILE" logs --tail 200 teamcity-server
-            exit 1
-          fi
-
-      # 8. Run regular tests
-      # Preconditions are excluded from the regular test suite
-      - name: Run tests
-        run: |
-          mvn clean test \
-            -DexcludedGroups=precondition
-
-      # 9. Show TeamCity logs if something failed
-      - name: TeamCity logs
-        if: failure()
-        run: |
-          docker compose -f "$COMPOSE_FILE" logs --tail 300 teamcity-server
-          docker compose -f "$COMPOSE_FILE" logs --tail 300 teamcity-agent
-
-      # 10. Stop Docker environment
-      - name: Stop TeamCity environment
-        if: always()
-        run: |
-          docker compose -f "$COMPOSE_FILE" down -v --remove-orphans
+# 9. Run regular tests
+- name: Run tests
+  run: |
+    mvn clean test -DexcludedGroups=precondition
