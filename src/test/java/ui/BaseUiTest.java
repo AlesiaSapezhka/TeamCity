@@ -13,9 +13,8 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 public class BaseUiTest extends BaseTest {
     @BeforeAll
     public static void setupSelenoid() {
-        Configuration.remote = api.configs.Config.getProperty("uiRemote");
-        Configuration.baseUrl = api.configs.Config.getProperty("uiBaseUrl");
-        Configuration.browser = api.configs.Config.getProperty("browser");
+        // Provider owns the remote session, so Configuration.remote must stay unset
+        Configuration.browser = SelenoidWebDriverProvider.class.getName();
         Configuration.baseUrl = api.configs.Config.getProperty("uiBaseUrl");
         Configuration.browserSize = api.configs.Config.getProperty("browserSize");
 

@@ -26,11 +26,14 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class BuildSteps {
+public final class BuildSteps {
     private static final String BLANK_BUILD_MESSAGE = "When creating a build type, non empty name should be provided.";
     private static final String NOT_FOUND_STATUS_TEXT = "Responding with error, status code: 404 (Not Found).";
     private static final String BAD_REQUEST_STATUS_TEXT = "Responding with error, status code: 400 (Bad Request).";
     private static final String NOT_EXISTING_BUILD_MESSAGE = "Invalid value of dimension 'id': 'null'. Should be a number.";
+
+    private BuildSteps() {
+    }
 
     public static CreateBuildTypeRequest buildValid(String projectId) {
         CreateBuildTypeRequest request =

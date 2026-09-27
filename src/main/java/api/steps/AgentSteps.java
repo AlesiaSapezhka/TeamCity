@@ -16,9 +16,12 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class AgentSteps {
+public final class AgentSteps {
 
     private static final String AGENT_NAME = "teamcity-agent";
+
+    private AgentSteps() {
+    }
 
     public static void ensureAgentReady() {
 

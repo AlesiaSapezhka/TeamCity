@@ -13,9 +13,12 @@ import io.restassured.response.ValidatableResponse;
 import java.util.List;
 import java.util.Map;
 
-public class ProjectSteps {
+public final class ProjectSteps {
     private static final String BLANK_PROJECT_MESSAGE = "Project name cannot be empty.";
     private static final String BAD_REQUEST_STATUS_TEXT = "Responding with error, status code: 400 (Bad Request).";
+
+    private ProjectSteps() {
+    }
 
     public static CreateProjectRequest buildProjectValid() {
         return RandomModelGenerator.generate(CreateProjectRequest.class);
