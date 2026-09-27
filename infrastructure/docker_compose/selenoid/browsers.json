@@ -19,13 +19,13 @@
       }
     }
   },
-  "edge": {
-    "default": "128.0",
+  "opera": {
+    "default": "109.0",
     "versions": {
       "109.0": {
-        "image": "selenoid/vnc:MicrosoftEdge_128.0",
+        "image": "selenoid/vnc:opera_109.0",
         "port": "4444",
-        "path": "/wd/hub"
+        "path": "/"
       }
     }
   }

@@ -36,10 +36,10 @@ jobs:
             tests: 'ui/**/*Test.java'
             browser: firefox
             browserVersion: '125.0'
-          - name: ui-edge
+          - name: ui-opera
             tests: 'ui/**/*Test.java'
-            browser: edge
-            browserVersion: '128.0'
+            browser: opera
+            browserVersion: '109.0'
 
     steps:
       - uses: actions/checkout@v4
