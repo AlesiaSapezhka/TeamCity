@@ -29,8 +29,8 @@ public class TeamCityInstallationClient {
         proceedInstallation();
         proceedDatabase();
         acceptLicense();
-//        waitForTeamCityReady();
         authenticateSuperUser();
+        waitForTeamCityReady();
     }
 
     private void authenticateSuperUser() {
