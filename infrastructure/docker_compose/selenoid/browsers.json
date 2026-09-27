@@ -19,7 +19,7 @@
       }
     }
   },
-  "opera": {
+  "edge": {
     "default": "128.0",
     "versions": {
       "109.0": {
