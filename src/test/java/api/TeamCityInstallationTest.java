@@ -17,7 +17,7 @@ import ui.steps.TeamCityInstallationSteps;
 
 
 /**
- * Environment precondition: runs once against a freshly started TeamCity stack.
+ * Environment precondition: runs once against a freshly started TeamCity stack
  */
 @Tag("precondition")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
