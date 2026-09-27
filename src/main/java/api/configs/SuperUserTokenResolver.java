@@ -19,8 +19,8 @@ public final class SuperUserTokenResolver {
             Pattern.CASE_INSENSITIVE
     );
 
-    private static final Duration TOKEN_TIMEOUT = Duration.ofMinutes(2);
-    private static final Duration POLL_INTERVAL = Duration.ofSeconds(2);
+    private static final Duration TOKEN_TIMEOUT = Duration.ofMinutes(4);
+    private static final Duration POLL_INTERVAL = Duration.ofSeconds(5);
 
     private static String cachedToken;
 
