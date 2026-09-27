@@ -23,9 +23,9 @@
     "default": "109.0",
     "versions": {
       "109.0": {
-        "image": "selenoid/vnc:opera_109.0",
+        "image": "selenoid/vnc_opera:109.0",
         "port": "4444",
-        "path": "/"
+        "path": "/wd/hub"
       }
     }
   }

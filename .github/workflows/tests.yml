@@ -5,21 +5,25 @@ on:
     branches:
       - main
       - master
+
   pull_request:
+
   workflow_dispatch:
 
 env:
   COMPOSE_FILE: infrastructure/docker_compose/docker-compose.yml
   TEAMCITY_URL: http://localhost:8111
-  # TeamCity as seen from the browser container, which joins teamcity-network
   UIBASEURL: http://teamcity-server:8111
 
+permissions:
+  contents: write
+
 jobs:
+
   test:
     name: ${{ matrix.name }}
     runs-on: ubuntu-latest
 
-    # Each entry provisions its own TeamCity stack, so all suites run in parallel
     strategy:
       fail-fast: false
       matrix:
@@ -28,23 +32,29 @@ jobs:
             tests: 'api/**/*Test.java'
             browser: chrome
             browserVersion: '128.0'
+
           - name: ui-chrome
             tests: 'ui/**/*Test.java'
             browser: chrome
             browserVersion: '128.0'
+
           - name: ui-firefox
             tests: 'ui/**/*Test.java'
             browser: firefox
             browserVersion: '125.0'
+
           - name: ui-opera
             tests: 'ui/**/*Test.java'
             browser: opera
             browserVersion: '109.0'
 
     steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
           distribution: corretto
           java-version: '21'
@@ -53,61 +63,155 @@ jobs:
       - name: Start TeamCity environment
         run: |
           docker compose -f "$COMPOSE_FILE" up -d
-          docker pull selenoid/vnc_chrome:128.0
-
-      - name: Pull browser image
-        if: matrix.browser != 'chrome'
-        run: docker pull "selenoid/vnc:${{ matrix.browser }}_${{ matrix.browserVersion }}"
 
       - name: Wait for TeamCity HTTP server
         run: |
           for i in $(seq 1 60); do
-            status=$(curl -s -o /dev/null -w "%{http_code}" "$TEAMCITY_URL/mnt" || true)
+            status=$(curl -s -o /dev/null -w "%{http_code}" \
+              "$TEAMCITY_URL/mnt" || true)
+
             echo "Attempt $i/60: status=$status"
-            [ "$status" = "200" ] && exit 0
+
+            if [ "$status" = "200" ]; then
+              exit 0
+            fi
+
             sleep 5
           done
-          docker compose -f "$COMPOSE_FILE" logs --tail 300 teamcity-server
+
+          docker compose -f "$COMPOSE_FILE" \
+            logs --tail 300 teamcity-server
+
           exit 1
 
-      # Super User token is resolved lazily from the container log (superuser.token=auto),
-      # because TeamCity regenerates it when the server leaves maintenance mode
       - name: Install and configure TeamCity
         env:
           BROWSER: chrome
           BROWSERVERSION: '128.0'
-        run: mvn -B --no-transfer-progress test -Dgroups=precondition -DexcludedGroups=
+        run: |
+          mvn -B --no-transfer-progress \
+            test \
+            -Dgroups=precondition \
+            -DexcludedGroups=
 
       - name: Wait for TeamCity readiness
         run: |
           for i in $(seq 1 60); do
-            status=$(curl -s -o /dev/null -w "%{http_code}" "$TEAMCITY_URL/healthCheck/ready" || true)
+            status=$(curl -s -o /dev/null -w "%{http_code}" \
+              "$TEAMCITY_URL/healthCheck/ready" || true)
+
             echo "Attempt $i/60: ready=$status"
-            [ "$status" = "200" ] && exit 0
+
+            if [ "$status" = "200" ]; then
+              exit 0
+            fi
+
             sleep 5
           done
-          docker compose -f "$COMPOSE_FILE" logs --tail 300 teamcity-server
+
+          docker compose -f "$COMPOSE_FILE" \
+            logs --tail 300 teamcity-server
+
           exit 1
 
       - name: Run tests
         env:
           BROWSER: ${{ matrix.browser }}
           BROWSERVERSION: ${{ matrix.browserVersion }}
-        run: mvn -B --no-transfer-progress test -Dtest='${{ matrix.tests }}'
+        run: |
+          mvn -B --no-transfer-progress \
+            test \
+            -Dtest='${{ matrix.tests }}'
+
+      - name: Upload Allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-${{ matrix.name }}
+          path: target/allure-results
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload Surefire results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-${{ matrix.name }}
+          path: target/surefire-reports
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Container logs
         if: failure()
         run: |
-          docker compose -f "$COMPOSE_FILE" logs --tail 500 teamcity-server
-          docker compose -f "$COMPOSE_FILE" logs --tail 500 teamcity-agent
-          docker compose -f "$COMPOSE_FILE" logs --tail 300 selenoid
+          docker compose -f "$COMPOSE_FILE" \
+            logs --tail 500 teamcity-server
 
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: surefire-${{ matrix.name }}
-          path: target/surefire-reports
+          docker compose -f "$COMPOSE_FILE" \
+            logs --tail 500 teamcity-agent
+
+          docker compose -f "$COMPOSE_FILE" \
+            logs --tail 300 selenoid
 
       - name: Stop TeamCity environment
         if: always()
-        run: docker compose -f "$COMPOSE_FILE" down -v --remove-orphans
+        run: |
+          docker compose -f "$COMPOSE_FILE" \
+            down -v --remove-orphans
+
+
+  allure:
+    name: Allure Report
+    runs-on: ubuntu-latest
+
+    needs: test
+    if: always()
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Allure results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: allure-results-*
+          path: allure-results
+          merge-multiple: true
+
+      - name: List Allure results
+        run: |
+          echo "Collected Allure results:"
+          find allure-results -type f | sort
+
+      - name: Get Allure history
+        uses: actions/checkout@v4
+        if: always()
+        continue-on-error: true
+        with:
+          ref: gh-pages
+          path: gh-pages
+
+      - name: Build Allure report
+        uses: simple-elf/allure-report-action@master
+        if: always()
+        with:
+          allure_results: allure-results
+          gh_pages: gh-pages
+          allure_report: allure-report
+          allure_history: allure-history
+
+      - name: Publish Allure report
+        uses: peaceiris/actions-gh-pages@v4
+        if: always()
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: allure-history
+
+      - name: Add Allure report link
+        if: always()
+        run: |
+          echo "## Allure Report" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "[Open Allure Report](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/)" >> "$GITHUB_STEP_SUMMARY"
