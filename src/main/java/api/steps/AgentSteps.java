@@ -23,7 +23,7 @@ public class AgentSteps {
     public static void ensureAgentReady() {
 
         await()
-                .atMost(Duration.ofMinutes(1))
+                .atMost(Duration.ofMinutes(3))
                 .pollInterval(Duration.ofSeconds(10))
                 .untilAsserted(() -> {
 
@@ -62,7 +62,7 @@ public class AgentSteps {
         ValidatedCrudRequester<AgentResponse> agentsRequester =
                 new ValidatedCrudRequester<>(
                         RequestSpecs.userSpec(),
-                        Endpoints.AGENTS,
+                        Endpoints.AGENTS_ANY,
                         ResponseSpecs.requestReturnsOK()
                 );
 

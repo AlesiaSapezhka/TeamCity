@@ -18,7 +18,9 @@
         <junit.jupiter.version>5.11.4</junit.jupiter.version>
         <lombok.version>1.18.46</lombok.version>
 
-        <excludedGroups></excludedGroups>
+        <!-- Preconditions set up a fresh server; run them explicitly with -Dgroups=precondition -->
+        <excludedGroups>precondition</excludedGroups>
+        <groups></groups>
     </properties>
 
     <dependencies>
@@ -96,6 +98,7 @@
                 <version>3.5.2</version>
                 <configuration>
                     <excludedGroups>${excludedGroups}</excludedGroups>
+                    <groups>${groups}</groups>
                 </configuration>
             </plugin>
 

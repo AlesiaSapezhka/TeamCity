@@ -36,6 +36,13 @@ public enum Endpoints {
             AgentResponse.class
     ),
 
+    // The default /agents list omits unauthorized and disconnected agents
+    AGENTS_ANY(
+            "/agents?locator=authorized:any,connected:any,enabled:any",
+            BaseModel.class,
+            AgentResponse.class
+    ),
+
     AGENT_AUTHORIZED(
             "/agents/{agentLocator}/authorizedInfo",
             BaseModel.class,

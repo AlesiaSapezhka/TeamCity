@@ -1,46 +1,71 @@
 package api;
 
-import api.models.user.CreateUserRequest;
 import api.models.user.TokenResponse;
-import api.models.user.UserResponse;
 import api.specs.RequestSpecs;
 import api.steps.AgentSteps;
 import api.steps.AuthSteps;
 import api.steps.UserSteps;
-import common.TeamCityInstallationClient;
+import common.data.TeamCityAdminData;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+import ui.BaseUiTest;
+import ui.steps.AgentUiSteps;
+import ui.steps.TeamCityInstallationSteps;
 
-import static io.restassured.RestAssured.given;
 
+/**
+ * Environment precondition: runs once against a freshly started TeamCity stack.
+ */
 @Tag("precondition")
-public class TeamCityInstallationTest extends  BaseTest {
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+public class TeamCityInstallationTest extends BaseUiTest {
 
     @Test
-    void  setUpTeamCity() {
-        new TeamCityInstallationClient().install();
-//        given()
-//                .baseUri("http://localhost:8111")
-//                .when()
-//                .get("/healthCheck/ready")
-//                .then()
-//                .statusCode(200);
+    @Order(1)
+    void setUpTeamCity() {
+        TeamCityInstallationSteps.install();
+    }
 
+    @Test
+    @Order(2)
+    void setUpAgent() {
         AuthSteps.ensurePerProjectPermissions();
 
-        CreateUserRequest request = UserSteps.buildUserValid();
-        UserResponse user = UserSteps.createUserValid(request);
-        UserSteps.grantSystemAdmin(user.getUsername());
+        UserSteps.ensureUserExists(
+                TeamCityAdminData.USERNAME,
+                TeamCityAdminData.PASSWORD
+        );
 
-        TokenResponse token = UserSteps.createToken(request.getUsername(), request.getPassword());
-        if (token.getValue() == null || token.getValue().isBlank()) {
+        UserSteps.grantSystemAdmin(
+                TeamCityAdminData.USERNAME
+        );
+
+        TokenResponse token =
+                UserSteps.createToken(
+                        TeamCityAdminData.USERNAME,
+                        TeamCityAdminData.PASSWORD
+                );
+
+        if (token.getValue() == null
+                || token.getValue().isBlank()) {
+
             throw new IllegalStateException(
-                    "TokenResponse.value is empty after createToken for user " + user.getUsername()
+                    "Admin token is empty"
             );
         }
-        RequestSpecs.setUserToken(token.getValue());
 
+        RequestSpecs.setUserToken(
+                token.getValue()
+        );
+
+        AgentUiSteps.authorizeAgent();
         AgentSteps.ensureAgentReady();
-        UserSteps.deleteUser(user.getUsername());
+
+        AgentSteps.assertAgentReady(
+                AgentSteps.findAgent()
+        );
     }
 }

@@ -30,6 +30,28 @@ public final class UserSteps {
         return RandomModelGenerator.generate(CreateUserRequest.class);
     }
 
+    /**
+     * Idempotent: the wizard may or may not have created the account already.
+     */
+    public static void ensureUserExists(String username, String password) {
+        int status = new CrudRequester(
+                RequestSpecs.superUserSpec(),
+                Endpoints.USER,
+                ResponseSpecs.anyStatus()
+        ).get(Map.of("userLocator", "username:" + username))
+                .extract()
+                .statusCode();
+
+        if (status == 200) {
+            return;
+        }
+
+        createUserValid(CreateUserRequest.builder()
+                .username(username)
+                .password(password)
+                .build());
+    }
+
     public static UserResponse createUserValid(CreateUserRequest request) {
         return new ValidatedCrudRequester<UserResponse>(
                 RequestSpecs.superUserSpec(),
@@ -71,8 +93,7 @@ public final class UserSteps {
     /**
      * Grant global SYSTEM_ADMIN (requires per-project permissions enabled).
      */
-    public static void grantSystemAdmin(String username) {
-        new ValidatedCrudRequester<Role>(
+    public static void grantSystemAdmin(String username) {        new ValidatedCrudRequester<Role>(
                 RequestSpecs.superUserSpec(),
                 Endpoints.USER_ROLE,
                 ResponseSpecs.requestReturnsOK()

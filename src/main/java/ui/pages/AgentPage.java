@@ -4,10 +4,14 @@ import com.codeborne.selenide.Condition;
 import com.codeborne.selenide.Selectors;
 import com.codeborne.selenide.SelenideElement;
 
+import java.time.Duration;
+
 import static com.codeborne.selenide.Condition.*;
 import static com.codeborne.selenide.Selenide.*;
 
 public class AgentPage extends BasePage<AgentPage> {
+
+    private static final Duration AUTHORIZATION_TIMEOUT = Duration.ofMinutes(1);
 
     private static final String AGENT_PAGE_TITLE = "Overview";
     private static final String ALL_AGENT_TAB = "All Agents";
@@ -23,6 +27,8 @@ public class AgentPage extends BasePage<AgentPage> {
     private final SelenideElement commentInput = $("textarea.ring-input-input[placeholder='Add an explanation for colleagues']");
     private final SelenideElement submitDisableButton = $x("//button[@type='submit' and normalize-space(.)='Disable']");
     private final SelenideElement submitEnableButton = $x("//button[@type='submit' and normalize-space(.)='Enable']");
+    private final SelenideElement authorizeButton = $("[data-test-authorize-agent]");
+    private final SelenideElement submitAuthorizeButton = $x("//button[@type='submit' and normalize-space(.)='Authorize']");
 
     @Override
     public String url() {
@@ -83,5 +89,31 @@ public class AgentPage extends BasePage<AgentPage> {
         return this.verifyOverviewHeader()
                 .verifyAllAgentsTabIsVisible()
                 .verifyIdleStatusIsVisible();
+    }
+
+    public boolean isAuthorizationRequired() {
+        return authorizeButton.is(visible);
+    }
+
+    public AgentPage clickAuthorize() {
+        return click(authorizeButton);
+    }
+
+    public AgentPage confirmAuthorize() {
+        elementShouldBeVisible(submitAuthorizeButton);
+        executeJavaScript("arguments[0].click();", submitAuthorizeButton);
+        return this;
+    }
+
+    public AgentPage authorize(String comment) {
+        return clickAuthorize()
+                .enterComment(comment)
+                .confirmAuthorize()
+                .verifyAgentIsAuthorized();
+    }
+
+    public AgentPage verifyAgentIsAuthorized() {
+        authorizeButton.shouldNot(exist, AUTHORIZATION_TIMEOUT);
+        return this;
     }
 }
