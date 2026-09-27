@@ -19,7 +19,7 @@ public class BaseUiTest extends BaseTest {
         Configuration.remote = api.configs.Config.getProperty("uiRemote");
         Configuration.baseUrl = api.configs.Config.getProperty("uiBaseUrl");
         Configuration.browser = api.configs.Config.getProperty("browser");
-        Configuration.browserVersion = "128.0";
+        Configuration.browserVersion = api.configs.Config.getProperty("browserVersion");
         Configuration.browserSize = api.configs.Config.getProperty("browserSize");
 
         // VNC Chrome images expect headed Chrome; headless often breaks session startup
