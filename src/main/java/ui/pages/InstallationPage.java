@@ -7,7 +7,7 @@ import java.time.Duration;
 
 import static com.codeborne.selenide.Selenide.$;
 
-public class InstallationPage extends BasePage {
+public class InstallationPage extends BasePage<InstallationPage> {
 
     // Each wizard step triggers server-side work that outlasts the default timeout
     private static final Duration STEP_TIMEOUT = Duration.ofMinutes(3);
