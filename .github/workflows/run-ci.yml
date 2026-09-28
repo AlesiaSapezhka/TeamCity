@@ -1,14 +1,53 @@
-name: Checkstyle & Parallel Automation Tests
+name: Checkstyle, Parallel Matrix Tests & Allure Pages
 
 on:
   push:
     branches: [ nikita_ci ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  run-test-automation:
-    name: Code Control & Run Parallel Tests
+  # ЭТАП 1: ВАША ПРОВЕРКА КАЧЕСТВА КОДА
+  checkstyle:
+    name: Code Control (Checkstyle)
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'corretto'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Run Checkstyle Validation
+        run: mvn checkstyle:check
+
+  # ЭТАП 2: ПАРАЛЛЕЛЬНЫЙ ВЕЕР ТЕСТОВ (МАТРИЦА КОЛЛЕГИ + ВАША ИНФРАСТРУКТУРА)
+  test-matrix:
+    name: Run ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    needs: checkstyle # Запустится только если Checkstyle прошёл успешно
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            profile: api
+            browser: chrome
+          - name: ui-chrome
+            profile: ui
+            browser: chrome
+          - name: ui-firefox
+            profile: ui
+            browser: firefox
+          - name: ui-opera
+            profile: ui
+            browser: opera
 
     steps:
       - name: Checkout repository
@@ -21,18 +60,61 @@ jobs:
           java-version: '21'
           cache: 'maven'
 
-      # 1. Скачивание браузеров и старт infraestructura
-      - name: Start Test Infrastructure
+      # Использование вашего скрипта для поднятия Docker Compose и Selenoid
+      - name: Start Infrastructure and Pull Browsers
         run: |
           cd infra/docker_compose
           chmod +x restart_docker.sh
           ./restart_docker.sh
 
-      # Выжидаем прогрев TeamCity
       - name: Wait for Server Warmup
         run: sleep 40
 
-      # 2. УСТАНОВКА ALLURE CLI
+      # Запуск конкретного бакета тестов из матрицы
+      - name: Run Matrix Test Bucket
+        env:
+          APIBASEURL: http://docker.internal
+          UIBASEURL: http://docker.internal
+        run: |
+          chmod +x run-tests.sh
+          ./run-tests.sh ${{ matrix.profile }}
+
+      # Вытаскиваем сырые результаты из контейнера наружу для сборщика
+      - name: Extract Allure Results From Container
+        if: always()
+        run: |
+          mkdir -p target/allure-results
+          cp -r allure-results/${matrix.profile}_${matrix.browser}/. target/allure-results/ || true
+
+      # Сохраняем промежуточные результаты каждого браузера в артефакты
+      - name: Upload Intermediate Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-${{ matrix.name }}
+          path: target/allure-results/
+          if-no-files-found: warn
+          retention-days: 1
+
+  # ЭТАП 3: СХЛОПЫВАНИЕ РЕЗУЛЬТАТОВ И ПУБЛИКАЦИЯ В ИНТЕРНЕТ
+  allure-report:
+    name: Merge Results & Publish Allure Report
+    runs-on: ubuntu-latest
+    needs: test-matrix
+    if: always()
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Скачиваем все 4 архива результатов и склеиваем их в одну папку
+      - name: Download Allure Results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: allure-results-*
+          path: target/allure-results
+          merge-multiple: true
+
       - name: Install Allure CLI
         run: |
           sudo apt-get update
@@ -40,17 +122,14 @@ jobs:
           sudo npm install -g allure-commandline --save-dev
           allure --version
 
-      # 3. Запуск веерного скрипта (Checkstyle + API + 3 Browsers + Allure)
-      - name: Run Parallel Tests and Generate Report
+      - name: Generate Final Merged Allure Report
         run: |
-          chmod +x run-tests.sh
-          ./run-tests.sh
+          allure generate target/allure-results --clean -o allure-report
 
-      # 4. Сохранение чистого HTML Allure отчета в артефакты
-      - name: Upload Allure Report Artifact
+      # Автоматическая публикация отчёта на GitHub Pages
+      - name: Publish Allure Report to GitHub Pages
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          name: allure-report-artifact
-          path: test-output/*/allure-report/
-          retention-days: 7
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: allure-report
