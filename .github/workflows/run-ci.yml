@@ -35,18 +35,12 @@ jobs:
         run: sleep 40
 
       # 2. УСТАНОВКА ALLURE CLI
-      # Используем проверенный готовый плагин для установки allure в систему
+      # Установка через npm для стабильной работы на Ubuntu
       - name: Install Allure CLI
-        uses: simple-elf/allure-report-action@v1.11
-        with:
-          allure_version: 2.27.0
-          allure_results: allure-results
-          skip_annotations: true
-
-      # Дополнительно прописываем утилиту в глобальный путь
-      - name: Link Allure to Path
         run: |
-          sudo ln -s /src/allure-2.27.0/bin/allure /usr/bin/allure || true
+          sudo apt-get update
+          sudo apt-get install -y npm
+          sudo npm install -g allure-commandline --save-dev
           allure --version
 
       # 3. Запуск веерного скрипта (Checkstyle + API + 3 Browsers + Allure)
