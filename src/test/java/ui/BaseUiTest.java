@@ -18,8 +18,18 @@ public class BaseUiTest extends BaseTest {
     public static void setupSelenoid() {
         Configuration.remote = api.configs.Config.getProperty("uiRemote");
         Configuration.baseUrl = api.configs.Config.getProperty("uiBaseUrl");
-        Configuration.browser = api.configs.Config.getProperty("browser");
-        Configuration.browserVersion = "128.0";
+        // Читаем браузер из параметров
+        String browserName = api.configs.Config.getProperty("browser");
+        Configuration.browser = browserName;
+
+        if ("firefox".equalsIgnoreCase(browserName)) {
+            Configuration.browserVersion = "125.0";
+        } else if ("opera".equalsIgnoreCase(browserName)) {
+            Configuration.browserVersion = "109.0";
+        } else {
+            Configuration.browserVersion = "128.0";
+        }
+
         Configuration.browserSize = api.configs.Config.getProperty("browserSize");
 
         // VNC Chrome images expect headed Chrome; headless often breaks session startup

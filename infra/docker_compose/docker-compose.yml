@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # Сервер TeamCity
+  teamcity-server:
+    image: jetbrains/teamcity-server:latest
+    container_name: teamcity-server
+    ports:
+      - "8111:8111"
+    volumes:
+      - teamcity_server_data:/data/teamcity_server/datadir
+      - teamcity_server_logs:/opt/teamcity/logs
+    networks:
+      - teamcity_net
+
+  # Агент TeamCity
+  teamcity-agent:
+    image: jetbrains/teamcity-agent:latest
+    container_name: teamcity-agent
+    depends_on:
+      - teamcity-server
+    environment:
+      - SERVER_URL=http://teamcity-server:8111
+    volumes:
+      - teamcity_agent_conf:/data/teamcity_agent/conf
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - teamcity_net
+
+  # Selenoid (Браузерный хаб)
+  selenoid:
+    image: aerokube/selenoid:latest-release
+    container_name: selenoid
+    ports:
+      - "4444:4444"
+    volumes:
+      # Пробрасываем docker.sock, чтобы Selenoid мог поднимать контейнеры с браузерами
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Монтируем файл конфигурации browsers.json (выходим на два уровня вверх из папки infra/docker_compose)
+      - ../../config/browsers.json:/etc/selenoid/browsers.json:ro
+    command: ["-conf", "/etc/selenoid/browsers.json", "-video-output-dir", "/opt/selenoid/video", "-log-output-dir", "/opt/selenoid/logs"]
+    networks:
+      - teamcity_net
+
+  # Selenoid UI (Интерфейс для наблюдения тестов)
+  selenoid-ui:
+    image: aerokube/selenoid-ui:latest-release
+    container_name: selenoid-ui
+    ports:
+      - "8080:8080"
+    depends_on:
+      - selenoid
+    command: ["--selenoid-uri", "http://selenoid:4444"]
+    networks:
+      - teamcity_net
+
+volumes:
+  teamcity_server_data:
+  teamcity_server_logs:
+  teamcity_agent_conf:
+
+networks:
+  teamcity_net:
+    driver: bridge

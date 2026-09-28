@@ -1,0 +1,54 @@
+name: Checkstyle & Parallel Automation Tests
+
+on:
+  push:
+    branches: [ nikita_ci ]
+  workflow_dispatch:
+
+jobs:
+  run-test-automation:
+    name: Code Control & Run Parallel Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'corretto'
+          java-version: '21'
+          cache: 'maven'
+
+      # 1. Запуск инфраструктуры (TeamCity Server + Agent + Selenoid)
+      # На сервере GitHub Actions Docker Compose установлен из коробки!
+      # Выходим в папку с compose и поднимаем всё одной командой.
+      # Добавляем принудительное создание папки config, если её нет.
+
+      # 2. Скачивание браузеров и старт инфраструктуры
+      - name: Start Test Infrastructure
+        run: |
+          cd infra/docker_compose
+          chmod +x restart_docker.sh
+          ./restart_docker.sh
+
+      # Даем контейнерам 40 секунд, чтобы TeamCity успел сгенерировать токен в логи
+      - name: Wait for Server Warmup
+        run: sleep 40
+
+      # 3. Запуск вашего веерного скрипта (Checkstyle + API + 3 Browsers + Allure)
+      - name: Run Parallel Tests and Generate Report
+        run: |
+          chmod +x run-tests.sh
+          ./run-tests.sh
+
+      # 4. Сохранение Allure отчета в артефакты GitHub Actions
+      # Это позволит вам скачивать готовый схлопнутый отчет прямо из интерфейса GitHub!
+      - name: Upload Allure Report Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-artifact
+          path: test-output/*/allure-report/
+          retention-days: 7
