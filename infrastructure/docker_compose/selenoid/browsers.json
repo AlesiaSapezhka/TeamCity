@@ -22,7 +22,7 @@
   "opera": {
     "default": "108.0",
     "versions": {
-      "109.0": {
+      "108.0": {
         "image": "selenoid/vnc_opera:108.0",
         "port": "4444",
         "path": "/wd/hub"
