@@ -11,7 +11,7 @@ ${project.build.directory}/
 .idea
 
 ### Allure ###
-allure-results/
+target/allure-results/
 allure-report/
 
 ### Eclipse ###

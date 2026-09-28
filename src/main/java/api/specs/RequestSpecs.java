@@ -2,6 +2,7 @@ package api.specs;
 
 import api.configs.Config;
 import api.configs.SuperUserTokenResolver;
+import io.qameta.allure.restassured.AllureRestAssured;
 import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.filter.log.RequestLoggingFilter;
 import io.restassured.filter.log.ResponseLoggingFilter;
@@ -44,7 +45,8 @@ public final class RequestSpecs {
                 .setAccept(ContentType.JSON)
                 .addFilters(List.of(
                         new RequestLoggingFilter(),
-                        new ResponseLoggingFilter()
+                        new ResponseLoggingFilter(),
+                        new AllureRestAssured()
                 ))
                 .setBaseUri(baseUrl + restPath);
     }

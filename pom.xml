@@ -31,11 +31,32 @@
             <version>1.23.2</version>
         </dependency>
 
+        <!-- Подключение к JUnit 5 -->
         <dependency>
             <groupId>io.qameta.allure</groupId>
             <artifactId>allure-junit5</artifactId>
-            <version>${allure.version}</version>
-            <scope>test</scope>
+            <version>2.29.1</version>
+        </dependency>
+
+        <!-- Для API тестов с RestAssured -->
+        <dependency>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-rest-assured</artifactId>
+            <version>2.29.1</version>
+        </dependency>
+
+        <!-- Для UI тестов с Selenide -->
+        <dependency>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-selenide</artifactId>
+            <version>2.29.1</version>
+        </dependency>
+
+        <!-- Для улучшения отображения assertThat -->
+        <dependency>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-assertj</artifactId>
+            <version>2.29.1</version>
         </dependency>
 
         <dependency>
