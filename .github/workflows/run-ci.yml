@@ -79,12 +79,12 @@ jobs:
           chmod +x run-tests.sh
           ./run-tests.sh ${{ matrix.profile }}
 
-      # Вытаскиваем сырые результаты из контейнера наружу для сборщика
+            # Вытаскиваем сырые результаты из контейнера наружу для сборщика
       - name: Extract Allure Results From Container
         if: always()
         run: |
           mkdir -p target/allure-results
-          cp -r allure-results/${matrix.profile}_${matrix.browser}/. target/allure-results/ || true
+          cp -r allure-results/${{ matrix.profile }}_${{ matrix.browser }}/. target/allure-results/ || true
 
       # Сохраняем промежуточные результаты каждого браузера в артефакты
       - name: Upload Intermediate Results
