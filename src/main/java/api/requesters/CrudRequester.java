@@ -24,16 +24,12 @@ public class CrudRequester extends HttpRequest implements CrudEndpointInterface 
 
     @Override
     public ValidatableResponse post(BaseModel model) {
-        return StepLogger.log("Post request to" + endpoints.getUrl() + "with model: " + model, () -> {
-            return post(model, Collections.emptyMap());
-        });
+        return StepLogger.log("Post request to" + endpoints.getUrl() + "with model: " + model, () -> post(model, Collections.emptyMap()));
     }
 
     @Override
     public ValidatableResponse post() {
-        return StepLogger.log("Post request to " + endpoints.getUrl(), () -> {
-            return post(null, Collections.emptyMap());
-        });
+        return StepLogger.log("Post request to " + endpoints.getUrl(), () -> post(null, Collections.emptyMap()));
     }
 
     @Override
@@ -52,29 +48,25 @@ public class CrudRequester extends HttpRequest implements CrudEndpointInterface 
 
     @Override
     public ValidatableResponse get() {
-        return StepLogger.log("Get request to " + endpoints.getUrl(), () -> {
-            return get(Collections.emptyMap());
-        });
+        return StepLogger.log("Get request to " + endpoints.getUrl(), () -> get(Collections.emptyMap()));
     }
 
     @Override
     public ValidatableResponse get(Map<String, ?> pathParams) {
-        return StepLogger.log("Get request to " + endpoints.getUrl() + " path parameters: " + pathParams, () -> {
-            return given()
-                    .spec(requestSpecification)
-                    .pathParams(pathParams)
-                    .when()
-                    .get(endpoints.getUrl())
-                    .then()
-                    .spec(responseSpecification);
-        });
+        return StepLogger.log("Get request to " + endpoints.getUrl() + " path parameters: " + pathParams, () ->
+                given()
+                .spec(requestSpecification)
+                .pathParams(pathParams)
+                .when()
+                .get(endpoints.getUrl())
+                .then()
+                .spec(responseSpecification));
     }
 
     @Override
     public ValidatableResponse update(BaseModel model) {
-        return StepLogger.log("Put request to " + endpoints.getUrl() + " with model: " + model, () -> {
-            return update(model, Collections.emptyMap());
-        });
+        return StepLogger.log("Put request to " + endpoints.getUrl() + " with model: " + model, () ->
+                update(model, Collections.emptyMap()));
     }
 
     @Override
@@ -95,21 +87,17 @@ public class CrudRequester extends HttpRequest implements CrudEndpointInterface 
 
     @Override
     public ValidatableResponse delete() {
-        return StepLogger.log("Delete request to " + endpoints.getUrl(), () -> {
-            return delete(Collections.emptyMap());
-        });
+        return StepLogger.log("Delete request to " + endpoints.getUrl(), () -> delete(Collections.emptyMap()));
     }
 
     @Override
     public ValidatableResponse delete(Map<String, ?> pathParams) {
-        return StepLogger.log("Delete request to " + endpoints.getUrl() + " path parameters: " + pathParams, () -> {
-            return given()
-                    .spec(requestSpecification)
-                    .pathParams(pathParams)
-                    .when()
-                    .delete(endpoints.getUrl())
-                    .then()
-                    .spec(responseSpecification);
-        });
+        return StepLogger.log("Delete request to " + endpoints.getUrl() + " path parameters: " + pathParams, () -> given()
+                .spec(requestSpecification)
+                .pathParams(pathParams)
+                .when()
+                .delete(endpoints.getUrl())
+                .then()
+                .spec(responseSpecification));
     }
 }

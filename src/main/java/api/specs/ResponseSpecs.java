@@ -21,9 +21,6 @@ public final class ResponseSpecs {
                 .build();
     }
 
-    /**
-     * For existence probes, where a non-2xx answer is a valid outcome.
-     */
     public static ResponseSpecification anyStatus() {
         return defaultResponseBuilder().build();
     }
