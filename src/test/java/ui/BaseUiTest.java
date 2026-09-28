@@ -5,7 +5,6 @@ import com.codeborne.selenide.Selenide;
 import api.BaseTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.openqa.selenium.MutableCapabilities;
@@ -42,17 +41,6 @@ public class BaseUiTest extends BaseTest {
         caps.setCapability("selenoid:options", Map.of("enableVNC", true, "enableLog", true, "sessionTimeout", "5m"));
         Configuration.browserCapabilities = caps;
 
-    }
-
-    @BeforeEach
-    public void addAllureBrowserParameter() {
-        String browserName = api.configs.Config.getProperty("browser");
-        io.qameta.allure.Allure.getLifecycle().updateTestCase(testResult ->
-                testResult.getParameters().add(new io.qameta.allure.model.Parameter()
-                        .setName("Browser")
-                        .setValue(browserName != null ? browserName : "chrome")
-                )
-        );
     }
 
     @AfterEach

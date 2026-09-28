@@ -35,8 +35,9 @@ run_container_flow() {
   local browser=$2
   echo "🚀 Запуск потока: Профиль [$profile], Браузер [$browser]..."
 
-  MSYS_NO_PATHCONV=1 docker run --rm \
-    --add-host=host.docker.internal:host-gateway \
+   MSYS_NO_PATHCONV=1 docker run --rm \
+      --add-host=host.docker.internal:host-gateway \
+      --hostname="${profile}_${browser}" \
     -v "$TEST_OUTPUT_DIR/logs":/app/logs \
     -v "$ALLURE_RESULTS_DIR/${profile}_${browser}":/app/allure-results \
     -e TEST_PROFILE="$profile" \
@@ -78,6 +79,13 @@ echo ">>> Проверка качества кода (Checkstyle)..."
 MSYS_NO_PATHCONV=1 docker run --rm $IMAGE_NAME mvn checkstyle:check > "$TEST_OUTPUT_DIR/logs/checkstyle.log" 2>&1
 
 # 4. Схлопывание в один Allure отчет
+# Автоматически прописываем имя окружения в результаты перед генерацией отчета
+# Прописываем метки окружения строго в папки с json-результатами
+mkdir -p "$ALLURE_RESULTS_DIR/api_chrome" && echo "Browser=API" > "$ALLURE_RESULTS_DIR/api_chrome/environment.properties"
+mkdir -p "$ALLURE_RESULTS_DIR/ui_chrome" && echo "Browser=UI_Chrome" > "$ALLURE_RESULTS_DIR/ui_chrome/environment.properties"
+mkdir -p "$ALLURE_RESULTS_DIR/ui_firefox" && echo "Browser=UI_Firefox" > "$ALLURE_RESULTS_DIR/ui_firefox/environment.properties"
+mkdir -p "$ALLURE_RESULTS_DIR/ui_opera" && echo "Browser=UI_Opera" > "$ALLURE_RESULTS_DIR/ui_opera/environment.properties"
+
 if [ -d "$ALLURE_RESULTS_DIR" ]; then
     echo ">>> Генерация единого Allure отчета..."
     if command -v allure &> /dev/null; then
