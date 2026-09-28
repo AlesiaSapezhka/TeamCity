@@ -21,21 +21,18 @@ jobs:
           java-version: '21'
           cache: 'maven'
 
-      # 1. Запуск инфраструктуры (TeamCity Server + Agent + Selenoid)
-      # На сервере GitHub Actions Docker Compose установлен из коробки!
-      # Выходим в папку с compose и поднимаем всё одной командой.
+      # 1. Скачивание браузеров и старт infraestructura
       - name: Start Test Infrastructure
         run: |
           cd infra/docker_compose
           chmod +x restart_docker.sh
           ./restart_docker.sh
 
-      # Даем контейнерам 40 секунд, чтобы TeamCity успел сгенерировать токен в логи
+      # Выжидаем прогрев TeamCity
       - name: Wait for Server Warmup
         run: sleep 40
 
       # 2. УСТАНОВКА ALLURE CLI
-      # Установка через npm для стабильной работы на Ubuntu
       - name: Install Allure CLI
         run: |
           sudo apt-get update
