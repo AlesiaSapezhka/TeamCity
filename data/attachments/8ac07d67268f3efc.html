@@ -1,0 +1,58 @@
+<div>POST to http://localhost:8111/app/rest/buildTypes/id%3APW8fD8Bl/steps</div>
+
+    <h4>Body</h4>
+    <div>
+    <pre class="preformated-text">
+{
+    &quot;id&quot;: &quot;APbsJNRC&quot;,
+    &quot;name&quot;: &quot;Build_Step_Cksq&quot;,
+    &quot;type&quot;: &quot;simpleRunner&quot;,
+    &quot;disabled&quot;: true,
+    &quot;properties&quot;: {
+        &quot;count&quot;: null,
+        &quot;property&quot;: [
+            {
+                &quot;name&quot;: &quot;command.executable&quot;,
+                &quot;value&quot;: &quot;echo&quot;
+            },
+            {
+                &quot;name&quot;: &quot;command.parameters&quot;,
+                &quot;value&quot;: &quot;Command executed successfully&quot;
+            }
+        ]
+    }
+}    </pre>
+    </div>
+
+    <h4>Headers</h4>
+    <div>
+            <div>Authorization: Bearer eyJ0eXAiOiAiVENWMiJ9.eG1qN0ZVV0F1Yjg4VWl3ckxSa2k2anFzaTRT.MWZjNTYyYzctNDc4Zi00MWE5LWEzYzUtN2JkODZiYTY0M2Rh</div>
+            <div>Accept: application/json, application/javascript, text/javascript, text/json</div>
+            <div>Content-Type: application/json</div>
+    </div>
+
+
+
+    <h4>Curl</h4>
+    <div>
+        curl -v -X POST &#39;http://localhost:8111/app/rest/buildTypes/id%3APW8fD8Bl/steps&#39; -H &#39;Authorization: Bearer eyJ0eXAiOiAiVENWMiJ9.eG1qN0ZVV0F1Yjg4VWl3ckxSa2k2anFzaTRT.MWZjNTYyYzctNDc4Zi00MWE5LWEzYzUtN2JkODZiYTY0M2Rh&#39; -H &#39;Accept: application/json, application/javascript, text/javascript, text/json&#39; -H &#39;Content-Type: application/json&#39; -d &#39;{
+    &quot;id&quot;: &quot;APbsJNRC&quot;,
+    &quot;name&quot;: &quot;Build_Step_Cksq&quot;,
+    &quot;type&quot;: &quot;simpleRunner&quot;,
+    &quot;disabled&quot;: true,
+    &quot;properties&quot;: {
+        &quot;count&quot;: null,
+        &quot;property&quot;: [
+            {
+                &quot;name&quot;: &quot;command.executable&quot;,
+                &quot;value&quot;: &quot;echo&quot;
+            },
+            {
+                &quot;name&quot;: &quot;command.parameters&quot;,
+                &quot;value&quot;: &quot;Command executed successfully&quot;
+            }
+        ]
+    }
+}&#39;
+    </div>
+

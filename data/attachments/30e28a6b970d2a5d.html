@@ -1,0 +1,120 @@
+<div>PUT to http://localhost:8111/httpAuth/app/rest/server/authSettings</div>
+
+    <h4>Body</h4>
+    <div>
+    <pre class="preformated-text">
+{
+    &quot;allowGuest&quot;: false,
+    &quot;guestUsername&quot;: &quot;guest&quot;,
+    &quot;collapseLoginForm&quot;: false,
+    &quot;perProjectPermissions&quot;: true,
+    &quot;emailVerification&quot;: false,
+    &quot;buildAuthenticationMode&quot;: &quot;strict&quot;,
+    &quot;modules&quot;: {
+        &quot;module&quot;: [
+            {
+                &quot;name&quot;: &quot;Default&quot;,
+                &quot;properties&quot;: {
+                    &quot;count&quot;: 3,
+                    &quot;property&quot;: [
+                        {
+                            &quot;name&quot;: &quot;usersCanResetOwnPasswords&quot;,
+                            &quot;value&quot;: &quot;true&quot;
+                        },
+                        {
+                            &quot;name&quot;: &quot;usersCanChangeOwnPasswords&quot;,
+                            &quot;value&quot;: &quot;true&quot;
+                        },
+                        {
+                            &quot;name&quot;: &quot;freeRegistrationAllowed&quot;,
+                            &quot;value&quot;: &quot;false&quot;
+                        }
+                    ]
+                }
+            },
+            {
+                &quot;name&quot;: &quot;Token-Auth&quot;,
+                &quot;properties&quot;: {
+                    &quot;count&quot;: 0,
+                    &quot;property&quot;: [
+                        
+                    ]
+                }
+            },
+            {
+                &quot;name&quot;: &quot;HTTP-Basic&quot;,
+                &quot;properties&quot;: {
+                    &quot;count&quot;: 0,
+                    &quot;property&quot;: [
+                        
+                    ]
+                }
+            }
+        ]
+    }
+}    </pre>
+    </div>
+
+    <h4>Headers</h4>
+    <div>
+            <div>Authorization: Basic OjU5MDY0OTMxMjczNzU0NTE3ODY=</div>
+            <div>Accept: application/json, application/javascript, text/javascript, text/json</div>
+            <div>Content-Type: application/json</div>
+    </div>
+
+
+
+    <h4>Curl</h4>
+    <div>
+        curl -v -X PUT &#39;http://localhost:8111/httpAuth/app/rest/server/authSettings&#39; -H &#39;Authorization: Basic OjU5MDY0OTMxMjczNzU0NTE3ODY=&#39; -H &#39;Accept: application/json, application/javascript, text/javascript, text/json&#39; -H &#39;Content-Type: application/json&#39; -d &#39;{
+    &quot;allowGuest&quot;: false,
+    &quot;guestUsername&quot;: &quot;guest&quot;,
+    &quot;collapseLoginForm&quot;: false,
+    &quot;perProjectPermissions&quot;: true,
+    &quot;emailVerification&quot;: false,
+    &quot;buildAuthenticationMode&quot;: &quot;strict&quot;,
+    &quot;modules&quot;: {
+        &quot;module&quot;: [
+            {
+                &quot;name&quot;: &quot;Default&quot;,
+                &quot;properties&quot;: {
+                    &quot;count&quot;: 3,
+                    &quot;property&quot;: [
+                        {
+                            &quot;name&quot;: &quot;usersCanResetOwnPasswords&quot;,
+                            &quot;value&quot;: &quot;true&quot;
+                        },
+                        {
+                            &quot;name&quot;: &quot;usersCanChangeOwnPasswords&quot;,
+                            &quot;value&quot;: &quot;true&quot;
+                        },
+                        {
+                            &quot;name&quot;: &quot;freeRegistrationAllowed&quot;,
+                            &quot;value&quot;: &quot;false&quot;
+                        }
+                    ]
+                }
+            },
+            {
+                &quot;name&quot;: &quot;Token-Auth&quot;,
+                &quot;properties&quot;: {
+                    &quot;count&quot;: 0,
+                    &quot;property&quot;: [
+                        
+                    ]
+                }
+            },
+            {
+                &quot;name&quot;: &quot;HTTP-Basic&quot;,
+                &quot;properties&quot;: {
+                    &quot;count&quot;: 0,
+                    &quot;property&quot;: [
+                        
+                    ]
+                }
+            }
+        ]
+    }
+}&#39;
+    </div>
+

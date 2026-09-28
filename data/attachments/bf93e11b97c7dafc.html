@@ -1,0 +1,82 @@
+<div>POST to http://localhost:8111/app/rest/buildTypes</div>
+
+    <h4>Body</h4>
+    <div>
+    <pre class="preformated-text">
+{
+    &quot;id&quot;: &quot;c3No7Vaa&quot;,
+    &quot;name&quot;: &quot;Build_Cznv&quot;,
+    &quot;project&quot;: {
+        &quot;id&quot;: &quot;CvdNqnfZ&quot;,
+        &quot;internalId&quot;: null,
+        &quot;name&quot;: null,
+        &quot;parentProjectId&quot;: null,
+        &quot;description&quot;: null,
+        &quot;locator&quot;: null
+    },
+    &quot;steps&quot;: {
+        &quot;id&quot;: &quot;J9Qe_OCy&quot;,
+        &quot;name&quot;: &quot;Build_Step_Kaxs&quot;,
+        &quot;type&quot;: &quot;f8b2eca2&quot;,
+        &quot;disabled&quot;: true,
+        &quot;properties&quot;: {
+            &quot;count&quot;: 47,
+            &quot;property&quot;: [
+                {
+                    &quot;name&quot;: &quot;Build_ ysTdEygbzW&quot;,
+                    &quot;value&quot;: &quot;a2b7aa2b&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;Build_ oHZSfOsPtk&quot;,
+                    &quot;value&quot;: &quot;ed82010b&quot;
+                }
+            ]
+        }
+    }
+}    </pre>
+    </div>
+
+    <h4>Headers</h4>
+    <div>
+            <div>Authorization: Bearer eyJ0eXAiOiAiVENWMiJ9.SXJNWXlxZFNuT1lzVFdGVkdNcWJTVUF3Y3df.NTMxMjgxMjktOGJmNS00NzY3LTlhNzYtNDcxZmY1MGY2Mjg5</div>
+            <div>Accept: application/json, application/javascript, text/javascript, text/json</div>
+            <div>Content-Type: application/json</div>
+    </div>
+
+
+
+    <h4>Curl</h4>
+    <div>
+        curl -v -X POST &#39;http://localhost:8111/app/rest/buildTypes&#39; -H &#39;Authorization: Bearer eyJ0eXAiOiAiVENWMiJ9.SXJNWXlxZFNuT1lzVFdGVkdNcWJTVUF3Y3df.NTMxMjgxMjktOGJmNS00NzY3LTlhNzYtNDcxZmY1MGY2Mjg5&#39; -H &#39;Accept: application/json, application/javascript, text/javascript, text/json&#39; -H &#39;Content-Type: application/json&#39; -d &#39;{
+    &quot;id&quot;: &quot;c3No7Vaa&quot;,
+    &quot;name&quot;: &quot;Build_Cznv&quot;,
+    &quot;project&quot;: {
+        &quot;id&quot;: &quot;CvdNqnfZ&quot;,
+        &quot;internalId&quot;: null,
+        &quot;name&quot;: null,
+        &quot;parentProjectId&quot;: null,
+        &quot;description&quot;: null,
+        &quot;locator&quot;: null
+    },
+    &quot;steps&quot;: {
+        &quot;id&quot;: &quot;J9Qe_OCy&quot;,
+        &quot;name&quot;: &quot;Build_Step_Kaxs&quot;,
+        &quot;type&quot;: &quot;f8b2eca2&quot;,
+        &quot;disabled&quot;: true,
+        &quot;properties&quot;: {
+            &quot;count&quot;: 47,
+            &quot;property&quot;: [
+                {
+                    &quot;name&quot;: &quot;Build_ ysTdEygbzW&quot;,
+                    &quot;value&quot;: &quot;a2b7aa2b&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;Build_ oHZSfOsPtk&quot;,
+                    &quot;value&quot;: &quot;ed82010b&quot;
+                }
+            ]
+        }
+    }
+}&#39;
+    </div>
+

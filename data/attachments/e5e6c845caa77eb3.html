@@ -1,0 +1,82 @@
+<div>POST to http://localhost:8111/app/rest/buildTypes</div>
+
+    <h4>Body</h4>
+    <div>
+    <pre class="preformated-text">
+{
+    &quot;id&quot;: &quot;JcGJt4PV&quot;,
+    &quot;name&quot;: &quot;Build_Pwme&quot;,
+    &quot;project&quot;: {
+        &quot;id&quot;: &quot;DsRZ1yI4&quot;,
+        &quot;internalId&quot;: null,
+        &quot;name&quot;: null,
+        &quot;parentProjectId&quot;: null,
+        &quot;description&quot;: null,
+        &quot;locator&quot;: null
+    },
+    &quot;steps&quot;: {
+        &quot;id&quot;: &quot;lMoY9FYp&quot;,
+        &quot;name&quot;: &quot;Build_Step_Pbuj&quot;,
+        &quot;type&quot;: &quot;46914fc2&quot;,
+        &quot;disabled&quot;: false,
+        &quot;properties&quot;: {
+            &quot;count&quot;: 996,
+            &quot;property&quot;: [
+                {
+                    &quot;name&quot;: &quot;Build_ OIrakrjuPd&quot;,
+                    &quot;value&quot;: &quot;7e3311a0&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;Build_ niwJGGEKYD&quot;,
+                    &quot;value&quot;: &quot;072af9b6&quot;
+                }
+            ]
+        }
+    }
+}    </pre>
+    </div>
+
+    <h4>Headers</h4>
+    <div>
+            <div>Authorization: Bearer eyJ0eXAiOiAiVENWMiJ9.QWhuelVmMUd2MXZLUDVxdndsbVFYcFRncTBm.OWU3MTg0YmItMmVkYi00MWIyLWI4YzMtNTFjZDA2NGU1NzUx</div>
+            <div>Accept: application/json, application/javascript, text/javascript, text/json</div>
+            <div>Content-Type: application/json</div>
+    </div>
+
+
+
+    <h4>Curl</h4>
+    <div>
+        curl -v -X POST &#39;http://localhost:8111/app/rest/buildTypes&#39; -H &#39;Authorization: Bearer eyJ0eXAiOiAiVENWMiJ9.QWhuelVmMUd2MXZLUDVxdndsbVFYcFRncTBm.OWU3MTg0YmItMmVkYi00MWIyLWI4YzMtNTFjZDA2NGU1NzUx&#39; -H &#39;Accept: application/json, application/javascript, text/javascript, text/json&#39; -H &#39;Content-Type: application/json&#39; -d &#39;{
+    &quot;id&quot;: &quot;JcGJt4PV&quot;,
+    &quot;name&quot;: &quot;Build_Pwme&quot;,
+    &quot;project&quot;: {
+        &quot;id&quot;: &quot;DsRZ1yI4&quot;,
+        &quot;internalId&quot;: null,
+        &quot;name&quot;: null,
+        &quot;parentProjectId&quot;: null,
+        &quot;description&quot;: null,
+        &quot;locator&quot;: null
+    },
+    &quot;steps&quot;: {
+        &quot;id&quot;: &quot;lMoY9FYp&quot;,
+        &quot;name&quot;: &quot;Build_Step_Pbuj&quot;,
+        &quot;type&quot;: &quot;46914fc2&quot;,
+        &quot;disabled&quot;: false,
+        &quot;properties&quot;: {
+            &quot;count&quot;: 996,
+            &quot;property&quot;: [
+                {
+                    &quot;name&quot;: &quot;Build_ OIrakrjuPd&quot;,
+                    &quot;value&quot;: &quot;7e3311a0&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;Build_ niwJGGEKYD&quot;,
+                    &quot;value&quot;: &quot;072af9b6&quot;
+                }
+            ]
+        }
+    }
+}&#39;
+    </div>
+
