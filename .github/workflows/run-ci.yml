@@ -23,6 +23,7 @@ jobs:
 
       # 1. Запуск инфраструктуры (TeamCity Server + Agent + Selenoid)
       # На сервере GitHub Actions Docker Compose установлен из коробки!
+      # Выходим в папку с compose и поднимаем всё одной командой.
       - name: Start Test Infrastructure
         run: |
           cd infra/docker_compose
@@ -33,26 +34,28 @@ jobs:
       - name: Wait for Server Warmup
         run: sleep 40
 
-      # 2. УСТАНОВКА ALLURE CLI НА СЕРВЕР GITHUB ACTIONS
-      # Скачиваем официальный Linux-бинарник, распаковываем и прописываем в систему
+      # 2. УСТАНОВКА ALLURE CLI
+      # Используем проверенный готовый плагин для установки allure в систему
       - name: Install Allure CLI
+        uses: simple-elf/allure-report-action@v1.11
+        with:
+          allure_version: 2.27.0
+          allure_results: allure-results
+          skip_annotations: true
+
+      # Дополнительно прописываем утилиту в глобальный путь
+      - name: Link Allure to Path
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wget unzip
-          wget https://github.com
-          sudo tar -zxf allure-2.27.0.tgz -C /opt/
-          sudo ln -s /opt/allure-2.27.0/bin/allure /usr/bin/allure
+          sudo ln -s /src/allure-2.27.0/bin/allure /usr/bin/allure || true
           allure --version
 
-      # 3. Запуск вашего веерного скрипта (Checkstyle + API + 3 Browsers + Allure)
-      # Теперь проверка 'command -v allure' внутри вашего bash-скрипта успешно сработает!
+      # 3. Запуск веерного скрипта (Checkstyle + API + 3 Browsers + Allure)
       - name: Run Parallel Tests and Generate Report
         run: |
           chmod +x run-tests.sh
           ./run-tests.sh
 
-      # 4. Сохранение чистого HTML Allure отчета в артефакты GitHub Actions
-      # Указываем путь до папки allure-report, чтобы внутри ZIP лежал готовый сайт отчета
+      # 4. Сохранение чистого HTML Allure отчета в артефакты
       - name: Upload Allure Report Artifact
         if: always()
         uses: actions/upload-artifact@v4
