@@ -55,12 +55,12 @@ public class CrudRequester extends HttpRequest implements CrudEndpointInterface 
     public ValidatableResponse get(Map<String, ?> pathParams) {
         return StepLogger.log("Get request to " + endpoints.getUrl() + " path parameters: " + pathParams, () ->
                 given()
-                .spec(requestSpecification)
-                .pathParams(pathParams)
-                .when()
-                .get(endpoints.getUrl())
-                .then()
-                .spec(responseSpecification));
+                        .spec(requestSpecification)
+                        .pathParams(pathParams)
+                        .when()
+                        .get(endpoints.getUrl())
+                        .then()
+                        .spec(responseSpecification));
     }
 
     @Override

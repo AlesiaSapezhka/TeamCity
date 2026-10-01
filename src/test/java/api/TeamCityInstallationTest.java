@@ -1,20 +1,15 @@
 package api;
 
 import api.models.user.TokenResponse;
-import api.specs.RequestSpecs;
 import api.steps.AgentSteps;
 import api.steps.AuthSteps;
 import api.steps.UserSteps;
+import common.UserContext;
 import common.data.TeamCityAdminData;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.*;
 import ui.BaseUiTest;
 import ui.steps.AgentUiSteps;
 import ui.steps.TeamCityInstallationSteps;
-
 
 /**
  * Environment precondition: runs once against a freshly started TeamCity stack
@@ -57,15 +52,18 @@ public class TeamCityInstallationTest extends BaseUiTest {
             );
         }
 
-        RequestSpecs.setUserToken(
+        UserContext admin = new UserContext(
+                null,
+                TeamCityAdminData.USERNAME,
+                TeamCityAdminData.PASSWORD,
                 token.getValue()
         );
 
         AgentUiSteps.authorizeAgent();
-        AgentSteps.ensureAgentReady();
+        AgentSteps.ensureAgentReady(admin);
 
         AgentSteps.assertAgentReady(
-                AgentSteps.findAgent()
+                AgentSteps.findAgent(admin)
         );
     }
 }

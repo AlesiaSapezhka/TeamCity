@@ -27,7 +27,7 @@ public final class SuperUserTokenResolver {
     private SuperUserTokenResolver() {
     }
 
-    public static String resolve() {
+    public static synchronized String resolve() {
         String configured = Config.getProperty("superuser.token");
 
         if (configured != null

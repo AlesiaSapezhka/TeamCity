@@ -3,18 +3,21 @@ package common.extensions;
 import api.models.user.CreateUserRequest;
 import api.models.user.TokenResponse;
 import api.models.user.UserResponse;
-import api.specs.RequestSpecs;
 import api.steps.AuthSteps;
 import api.steps.UserSteps;
 import common.UserContext;
+import common.UserContexts;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.extension.*;
 
+/**
+ * Creates per-test user + PAT in {@link ExtensionContext.Store} (not ThreadLocal).
+ */
+@Order(1)
 public class CreateAndDeleteUserExtension
         implements BeforeEachCallback, AfterEachCallback, ParameterResolver {
 
-    private static final String USER_CONTEXT = "userContext";
-
-    private static final ExtensionContext.Namespace NAMESPACE =
+    public static final ExtensionContext.Namespace NAMESPACE =
             ExtensionContext.Namespace.create(CreateAndDeleteUserExtension.class);
 
     @Override
@@ -31,22 +34,20 @@ public class CreateAndDeleteUserExtension
                     "TokenResponse.value is empty after createToken for user " + user.getUsername()
             );
         }
-        RequestSpecs.setUserToken(token.getValue());
 
         UserContext userContext = new UserContext(
                 user.getId(),
                 user.getUsername(),
-                request.getPassword()
+                request.getPassword(),
+                token.getValue()
         );
-
-        context.getStore(NAMESPACE).put(USER_CONTEXT, userContext);
+        context.getStore(NAMESPACE).put(UserContexts.STORE_KEY, userContext);
     }
 
     @Override
     public void afterEach(ExtensionContext context) {
         UserContext userContext = context.getStore(NAMESPACE)
-                .remove(USER_CONTEXT, UserContext.class);
-
+                .remove(UserContexts.STORE_KEY, UserContext.class);
         if (userContext != null) {
             UserSteps.deleteUser(userContext.username());
         }
@@ -63,7 +64,6 @@ public class CreateAndDeleteUserExtension
     public Object resolveParameter(
             ParameterContext parameterContext,
             ExtensionContext extensionContext) {
-        return extensionContext.getStore(NAMESPACE)
-                .get(USER_CONTEXT, UserContext.class);
+        return UserContexts.require(extensionContext);
     }
 }

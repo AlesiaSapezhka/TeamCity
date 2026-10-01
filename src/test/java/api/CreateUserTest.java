@@ -1,10 +1,10 @@
 package api;
 
-import common.data.JsonPaths;
 import api.models.comparison.ModelAssertions;
 import api.models.user.CreateUserRequest;
 import api.models.user.UserResponse;
 import api.steps.UserSteps;
+import common.data.JsonPaths;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;

@@ -6,7 +6,8 @@ import com.codeborne.selenide.SelenideElement;
 
 import java.time.Duration;
 
-import static com.codeborne.selenide.Condition.*;
+import static com.codeborne.selenide.Condition.exist;
+import static com.codeborne.selenide.Condition.visible;
 import static com.codeborne.selenide.Selenide.*;
 
 public class AgentPage extends BasePage<AgentPage> {

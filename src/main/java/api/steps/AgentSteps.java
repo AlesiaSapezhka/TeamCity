@@ -6,6 +6,7 @@ import api.requesters.ValidatedCrudRequester;
 import api.requesters.interfaces.Endpoints;
 import api.specs.RequestSpecs;
 import api.specs.ResponseSpecs;
+import common.UserContext;
 
 import java.time.Duration;
 import java.util.List;
@@ -23,28 +24,28 @@ public final class AgentSteps {
     private AgentSteps() {
     }
 
-    public static void ensureAgentReady() {
-
+    public static void ensureAgentReady(UserContext user) {
         await()
                 .atMost(Duration.ofMinutes(3))
                 .pollInterval(Duration.ofSeconds(10))
                 .untilAsserted(() -> {
 
-                    AgentResponse agent = findAgent();
+                    AgentResponse agent = findAgent(user);
 
                     if (!Boolean.TRUE.equals(agent.getAuthorized())) {
-                        authorizeAgent(agent.getId());
+                        authorizeAgent(agent.getId(), user);
                     }
 
                     if (!Boolean.TRUE.equals(agent.getEnabled())) {
                         updateAgentEnabledStatus(
                                 agent.getId(),
                                 true,
-                                "Enable agent for automated tests"
+                                "Enable agent for automated tests",
+                                user
                         );
                     }
 
-                    AgentResponse actual = findAgent();
+                    AgentResponse actual = findAgent(user);
 
                     assertThat(actual.getConnected())
                             .as("Agent must be connected")
@@ -60,11 +61,10 @@ public final class AgentSteps {
                 });
     }
 
-    public static AgentResponse findAgent() {
-
+    public static AgentResponse findAgent(UserContext user) {
         ValidatedCrudRequester<AgentResponse> agentsRequester =
                 new ValidatedCrudRequester<>(
-                        RequestSpecs.userSpec(),
+                        RequestSpecs.userSpec(user),
                         Endpoints.AGENTS_ANY,
                         ResponseSpecs.requestReturnsOK()
                 );
@@ -80,7 +80,7 @@ public final class AgentSteps {
                 );
 
         return new ValidatedCrudRequester<AgentResponse>(
-                RequestSpecs.userSpec(),
+                RequestSpecs.userSpec(user),
                 Endpoints.AGENT,
                 ResponseSpecs.requestReturnsOK()
         ).get(
@@ -88,8 +88,7 @@ public final class AgentSteps {
         );
     }
 
-    private static void authorizeAgent(int agentId) {
-
+    private static void authorizeAgent(int agentId, UserContext user) {
         AgentEnabledInfoRequest request =
                 new AgentEnabledInfoRequest(
                         true,
@@ -97,7 +96,7 @@ public final class AgentSteps {
                 );
 
         new ValidatedCrudRequester<AgentResponse>(
-                RequestSpecs.userSpec(),
+                RequestSpecs.userSpec(user),
                 Endpoints.AGENT_AUTHORIZED,
                 ResponseSpecs.requestReturnsOK()
         ).update(
@@ -109,13 +108,14 @@ public final class AgentSteps {
     public static void updateAgentEnabledStatus(
             int agentId,
             boolean enabled,
-            String comment) {
+            String comment,
+            UserContext user) {
 
         AgentEnabledInfoRequest request =
                 new AgentEnabledInfoRequest(enabled, comment);
 
         new ValidatedCrudRequester<AgentResponse>(
-                RequestSpecs.userSpec(),
+                RequestSpecs.userSpec(user),
                 Endpoints.ENABLE_AGENT,
                 ResponseSpecs.requestReturnsOK()
         ).update(
@@ -125,7 +125,6 @@ public final class AgentSteps {
     }
 
     public static void assertAgentReady(AgentResponse agent) {
-
         assertAll(
                 () -> assertTrue(
                         agent.getConnected(),
@@ -142,10 +141,9 @@ public final class AgentSteps {
         );
     }
 
-    public static List<AgentResponse> getAllAgents() {
-
+    public static List<AgentResponse> getAllAgents(UserContext user) {
         return new ValidatedCrudRequester<AgentResponse>(
-                RequestSpecs.userSpec(),
+                RequestSpecs.userSpec(user),
                 Endpoints.AGENTS,
                 ResponseSpecs.requestReturnsOK()
         ).getList("agent");

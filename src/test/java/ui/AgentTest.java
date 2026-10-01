@@ -3,6 +3,7 @@ package ui;
 import api.generators.RandomData;
 import api.models.agent.AgentResponse;
 import api.steps.AgentSteps;
+import common.UserContext;
 import common.annotations.CreateUserAndLogIn;
 import common.annotations.EnableAgent;
 import org.junit.jupiter.api.Test;
@@ -21,14 +22,14 @@ public class AgentTest extends BaseUiTest {
             value = "teamcity-agent",
             mode = ResourceAccessMode.READ
     )
-    void userCanOpenAgentsOverviewAndSeeActiveAgent() {
+    void userCanOpenAgentsOverviewAndSeeActiveAgent(UserContext user) {
         new AgentPage()
                 .open()
                 .verifyAgentOverviewState()
                 .verifyAgentIsEnabled()
-                .verifyAgentIpAddress(AgentSteps.findAgent().getName());
+                .verifyAgentIpAddress(AgentSteps.findAgent(user).getName());
 
-        List<AgentResponse> agentsList = AgentSteps.getAllAgents();
+        List<AgentResponse> agentsList = AgentSteps.getAllAgents(user);
         softly.assertThat(agentsList).isNotEmpty();
         softly.assertThat(agentsList.size()).isEqualTo(1);
     }
@@ -40,7 +41,7 @@ public class AgentTest extends BaseUiTest {
             value = "teamcity-agent",
             mode = ResourceAccessMode.READ_WRITE
     )
-    void userCanToggleAgentStatusWithComments() {
+    void userCanToggleAgentStatusWithComments(UserContext user) {
         new AgentPage()
                 .open()
                 .verifyAgentIsEnabled()
@@ -53,6 +54,6 @@ public class AgentTest extends BaseUiTest {
                 .confirmEnable()
                 .verifyAgentIsEnabled();
 
-        AgentSteps.assertAgentReady(AgentSteps.findAgent());
+        AgentSteps.assertAgentReady(AgentSteps.findAgent(user));
     }
 }

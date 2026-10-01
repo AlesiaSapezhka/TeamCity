@@ -1,7 +1,5 @@
 package api;
 
-import common.annotations.CreateAndDeleteUser;
-import common.data.BuildInfo;
 import api.generators.BuildCommands;
 import api.generators.CommandLineCommand;
 import api.generators.RandomData;
@@ -12,8 +10,10 @@ import api.models.build_type.CreateBuildTypeRequest;
 import api.models.comparison.ModelAssertions;
 import api.steps.BuildSteps;
 import common.ProjectContext;
-import common.annotations.EnableAgent;
 import common.annotations.CreateAndDeleteProject;
+import common.annotations.CreateAndDeleteUser;
+import common.annotations.EnableAgent;
+import common.data.BuildInfo;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.ResourceAccessMode;
 import org.junit.jupiter.api.parallel.ResourceLock;
@@ -30,24 +30,21 @@ public class RunBuildTest extends BaseTest {
             mode = ResourceAccessMode.READ
     )
     void userCanRunBuildWithValidData(ProjectContext project) {
-        // Create Build
         CreateBuildTypeRequest buildRequest = BuildSteps.buildValid(project.projectId());
 
         BuildTypeResponse buildResponse =
-                BuildSteps.createBuild(buildRequest);
+                BuildSteps.createBuild(buildRequest, project.user());
 
         ModelAssertions.assertThatModels(buildRequest, buildResponse).match();
         softly.assertThat(buildResponse.getId()).isNotBlank();
 
         String buildTypeId = buildResponse.getId();
 
-        // Create Build step
         CommandLineCommand command = BuildCommands.randomCommandLineCommand();
-
         CreateBuildStepRequest buildStepRequest = BuildSteps.commandLine(command);
-        BuildSteps.addBuildStep(buildTypeId, buildStepRequest);
+        BuildSteps.addBuildStep(buildTypeId, buildStepRequest, project.user());
 
-        BuildTypeResponse build = BuildSteps.getBuild(buildTypeId);
+        BuildTypeResponse build = BuildSteps.getBuild(buildTypeId, project.user());
         BuildSteps.assertBuildStep(
                 build,
                 buildTypeId,
@@ -56,27 +53,24 @@ public class RunBuildTest extends BaseTest {
                 buildStepRequest
         );
 
-        // Run Build
-        BuildResponse buildRun = BuildSteps.runBuild(buildTypeId);
-        BuildResponse finishedBuild = BuildSteps.waitForBuild(buildRun.getId());
+        BuildResponse buildRun = BuildSteps.runBuild(buildTypeId, project.user());
+        BuildResponse finishedBuild = BuildSteps.waitForBuild(buildRun.getId(), project.user());
 
         softly.assertThat(finishedBuild.getState())
                 .isEqualTo(BuildInfo.FINISHED_STATE.getValue());
 
         softly.assertThat(finishedBuild.getStatus())
                 .isEqualTo(BuildInfo.SUCCESS_STATUS.getValue());
-
     }
 
     @Test
     @CreateAndDeleteUser
     @CreateAndDeleteProject
-    void userCanNotRunBuildWithoutBuildConfiguration() {
-        BuildResponse buildRun = BuildSteps.runBuildWithoutConfiguration(RandomData.getId());
-        BuildResponse build = BuildSteps.getNotExistingBuild(buildRun.getId());
+    void userCanNotRunBuildWithoutBuildConfiguration(ProjectContext project) {
+        BuildResponse buildRun = BuildSteps.runBuildWithoutConfiguration(RandomData.getId(), project.user());
+        BuildResponse build = BuildSteps.getNotExistingBuild(buildRun.getId(), project.user());
 
         softly.assertThat(build.getId()).isNull();
-
     }
 
     @Test
@@ -88,24 +82,21 @@ public class RunBuildTest extends BaseTest {
             mode = ResourceAccessMode.READ_WRITE
     )
     void userCanNotRunBuildWithoutConnectedAgent(ProjectContext project) {
-        // Create Build
         CreateBuildTypeRequest buildRequest = BuildSteps.buildValid(project.projectId());
 
         BuildTypeResponse buildResponse =
-                BuildSteps.createBuild(buildRequest);
+                BuildSteps.createBuild(buildRequest, project.user());
 
         ModelAssertions.assertThatModels(buildRequest, buildResponse).match();
         softly.assertThat(buildResponse.getId()).isNotBlank();
 
         String buildTypeId = buildResponse.getId();
 
-        // Create Build step
         CommandLineCommand command = BuildCommands.randomCommandLineCommand();
-
         CreateBuildStepRequest buildStepRequest = BuildSteps.commandLine(command);
-        BuildSteps.addBuildStep(buildTypeId, buildStepRequest);
+        BuildSteps.addBuildStep(buildTypeId, buildStepRequest, project.user());
 
-        BuildTypeResponse build = BuildSteps.getBuild(buildResponse.getId());
+        BuildTypeResponse build = BuildSteps.getBuild(buildResponse.getId(), project.user());
         BuildSteps.assertBuildStep(
                 build,
                 buildTypeId,
@@ -114,9 +105,8 @@ public class RunBuildTest extends BaseTest {
                 buildStepRequest
         );
 
-        // Run Build
-        BuildResponse buildRun = BuildSteps.runBuild(buildTypeId);
-        BuildResponse buildInfo = BuildSteps.getBuild(buildRun.getId());
+        BuildResponse buildRun = BuildSteps.runBuild(buildTypeId, project.user());
+        BuildResponse buildInfo = BuildSteps.getBuild(buildRun.getId(), project.user());
 
         assertEquals(
                 BuildInfo.QUEUED_STATE.getValue(),

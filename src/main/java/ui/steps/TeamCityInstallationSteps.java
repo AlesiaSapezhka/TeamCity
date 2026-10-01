@@ -3,16 +3,13 @@ package ui.steps;
 import api.configs.Config;
 import com.codeborne.selenide.Condition;
 import com.codeborne.selenide.SelenideElement;
+import common.data.TeamCityAdminData;
 import ui.pages.CreateAdminPage;
 import ui.pages.InstallationPage;
-import common.data.TeamCityAdminData;
 
 import java.time.Duration;
 
-import static com.codeborne.selenide.Selenide.$;
-import static com.codeborne.selenide.Selenide.open;
-import static com.codeborne.selenide.Selenide.refresh;
-import static com.codeborne.selenide.Selenide.sleep;
+import static com.codeborne.selenide.Selenide.*;
 
 public final class TeamCityInstallationSteps {
 

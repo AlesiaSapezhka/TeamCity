@@ -15,6 +15,27 @@ import java.util.Map;
 
 public class SelenoidWebDriverProvider implements WebDriverProvider {
 
+    private static Dimension parseBrowserSize(String browserSize) {
+        String[] dimensions = browserSize.split("x");
+        if (dimensions.length != 2) {
+            throw new IllegalArgumentException(
+                    "browserSize must have the format WIDTHxHEIGHT: " + browserSize
+            );
+        }
+        return new Dimension(
+                Integer.parseInt(dimensions[0]),
+                Integer.parseInt(dimensions[1])
+        );
+    }
+
+    private static URL remoteUrl() {
+        try {
+            return URI.create(Config.getProperty("uiRemote")).toURL();
+        } catch (MalformedURLException e) {
+            throw new IllegalStateException("Invalid uiRemote", e);
+        }
+    }
+
     @Override
     public WebDriver createDriver(Capabilities capabilities) {
 
@@ -36,35 +57,14 @@ public class SelenoidWebDriverProvider implements WebDriverProvider {
                 Map.of(
                         "enableVNC", true,
                         "enableLog", true,
-                "sessionTimeout", "5m",
-                "screenResolution",
-                windowSize.getWidth() + "x" + windowSize.getHeight() + "x24"
+                        "sessionTimeout", "5m",
+                        "screenResolution",
+                        windowSize.getWidth() + "x" + windowSize.getHeight() + "x24"
                 )
         );
 
         WebDriver driver = new RemoteWebDriver(remoteUrl(), remoteCapabilities);
         driver.manage().window().setSize(windowSize);
         return driver;
-    }
-
-    private static Dimension parseBrowserSize(String browserSize) {
-        String[] dimensions = browserSize.split("x");
-        if (dimensions.length != 2) {
-            throw new IllegalArgumentException(
-                    "browserSize must have the format WIDTHxHEIGHT: " + browserSize
-            );
-        }
-        return new Dimension(
-                Integer.parseInt(dimensions[0]),
-                Integer.parseInt(dimensions[1])
-        );
-    }
-
-    private static URL remoteUrl() {
-        try {
-            return URI.create(Config.getProperty("uiRemote")).toURL();
-        } catch (MalformedURLException e) {
-            throw new IllegalStateException("Invalid uiRemote", e);
-        }
     }
 }

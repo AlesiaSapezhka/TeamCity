@@ -1,6 +1,5 @@
 package api.steps;
 
-import api.generators.BuildCommands;
 import api.generators.CommandLineCommand;
 import api.generators.RandomModelGenerator;
 import api.models.build.BuildResponse;
@@ -17,6 +16,7 @@ import api.requesters.ValidatedCrudRequester;
 import api.requesters.interfaces.Endpoints;
 import api.specs.RequestSpecs;
 import api.specs.ResponseSpecs;
+import common.UserContext;
 import org.awaitility.Awaitility;
 
 import java.time.Duration;
@@ -56,77 +56,76 @@ public final class BuildSteps {
         return request;
     }
 
-    public static BuildTypeResponse createBuild(CreateBuildTypeRequest createBuildRequest) {
+    public static BuildTypeResponse createBuild(CreateBuildTypeRequest createBuildRequest, UserContext user) {
         return new ValidatedCrudRequester<BuildTypeResponse>(
-                RequestSpecs.userSpec(),
+                RequestSpecs.userSpec(user),
                 Endpoints.BUILD_TYPES,
                 ResponseSpecs.requestReturnsOK()
         ).post(createBuildRequest);
     }
 
-    public static BuildTypeResponse createBuildInvalid(CreateBuildTypeRequest createBuildRequest) {
+    public static BuildTypeResponse createBuildInvalid(CreateBuildTypeRequest createBuildRequest, UserContext user) {
         return new ValidatedCrudRequester<BuildTypeResponse>(
-                RequestSpecs.userSpec(),
+                RequestSpecs.userSpec(user),
                 Endpoints.BUILD_TYPES,
                 ResponseSpecs.requestReturnsBadRequest(BAD_REQUEST_STATUS_TEXT, BLANK_BUILD_MESSAGE)
         ).post(createBuildRequest);
     }
 
-    public static List<BuildTypeResponse> getAllBuilds(String jsonPath) {
+    public static List<BuildTypeResponse> getAllBuilds(String jsonPath, UserContext user) {
         return new ValidatedCrudRequester<BuildTypeResponse>(
-                RequestSpecs.userSpec(),
+                RequestSpecs.userSpec(user),
                 Endpoints.BUILD_TYPES,
                 ResponseSpecs.requestReturnsOK()
         ).getList(jsonPath);
     }
 
-    public static BuildResponse runBuild(String buildTypeId) {
+    public static BuildResponse runBuild(String buildTypeId, UserContext user) {
         RunBuildRequest request = createRunBuildRequest(buildTypeId);
 
         return new ValidatedCrudRequester<BuildResponse>(
-                RequestSpecs.userSpec(),
+                RequestSpecs.userSpec(user),
                 Endpoints.BUILD_QUEUE,
                 ResponseSpecs.requestReturnsOK()
         ).post(request);
     }
 
-    public static BuildResponse getBuild(Integer buildId) {
+    public static BuildResponse getBuild(Integer buildId, UserContext user) {
         return new ValidatedCrudRequester<BuildResponse>(
-                RequestSpecs.userSpec(),
+                RequestSpecs.userSpec(user),
                 Endpoints.BUILD,
                 ResponseSpecs.requestReturnsOK()
         ).get(Map.of("buildLocator", "id:" + buildId));
     }
 
-    public static BuildResponse getNotExistingBuild(Integer buildId) {
+    public static BuildResponse getNotExistingBuild(Integer buildId, UserContext user) {
         return new ValidatedCrudRequester<BuildResponse>(
-                RequestSpecs.userSpec(),
+                RequestSpecs.userSpec(user),
                 Endpoints.BUILD,
                 ResponseSpecs.requestReturnsBadRequest(BAD_REQUEST_STATUS_TEXT, NOT_EXISTING_BUILD_MESSAGE)
         ).get(Map.of("buildLocator", "id:" + buildId));
     }
 
-    public static BuildResponse runBuildWithoutConfiguration(String buildId) {
+    public static BuildResponse runBuildWithoutConfiguration(String buildId, UserContext user) {
         RunBuildRequest request = createRunBuildRequest(buildId);
 
         return new ValidatedCrudRequester<BuildResponse>(
-                RequestSpecs.userSpec(),
+                RequestSpecs.userSpec(user),
                 Endpoints.BUILD_QUEUE,
                 ResponseSpecs.requestReturnsNotFound(NOT_FOUND_STATUS_TEXT, runBuildWithoutConfigurationMessage(buildId))
         ).post(request);
-
     }
 
     private static String runBuildWithoutConfigurationMessage(String buildId) {
         return "No build type nor template is found by id " + "'" + buildId + "'.";
     }
 
-    public static BuildResponse waitForBuild(Integer buildId) {
+    public static BuildResponse waitForBuild(Integer buildId, UserContext user) {
         return Awaitility.await()
                 .atMost(Duration.ofMinutes(1))
                 .pollInterval(Duration.ofSeconds(5))
                 .until(
-                        () -> getBuild(Math.toIntExact(buildId)),
+                        () -> getBuild(Math.toIntExact(buildId), user),
                         build -> "finished".equalsIgnoreCase(build.getState())
                 );
     }
@@ -155,10 +154,11 @@ public final class BuildSteps {
 
     public static void addBuildStep(
             String buildTypeId,
-            CreateBuildStepRequest stepRequest) {
+            CreateBuildStepRequest stepRequest,
+            UserContext user) {
 
         new CrudRequester(
-                RequestSpecs.userSpec(),
+                RequestSpecs.userSpec(user),
                 Endpoints.BUILD_TYPE_STEPS,
                 ResponseSpecs.requestReturnsOK()
         ).post(
@@ -167,29 +167,23 @@ public final class BuildSteps {
         );
     }
 
-    public static BuildTypeResponse getBuild(String buildId) {
-
+    public static BuildTypeResponse getBuild(String buildId, UserContext user) {
         return new ValidatedCrudRequester<BuildTypeResponse>(
-                RequestSpecs.userSpec(),
+                RequestSpecs.userSpec(user),
                 Endpoints.BUILD_TYPE,
                 ResponseSpecs.requestReturnsOK()
         ).get(Map.of("btLocator", "id:" + buildId));
     }
 
-    /** Resolve build type created via UI (ID is auto-generated; lookup by name + project). */
-    public static BuildTypeResponse getBuildByName(String projectId, String buildName) {
+    public static BuildTypeResponse getBuildByName(String projectId, String buildName, UserContext user) {
         String locator = "name:" + buildName + ",project:(id:" + projectId + ")";
         return new ValidatedCrudRequester<BuildTypeResponse>(
-                RequestSpecs.userSpec(),
+                RequestSpecs.userSpec(user),
                 Endpoints.BUILD_TYPE,
                 ResponseSpecs.requestReturnsOK()
         ).get(Map.of("btLocator", locator));
     }
 
-    /**
-     * Build step as created in UI (Command Line → Custom script),
-     * so API assertions can match {@code script.content}.
-     */
     public static CreateBuildStepRequest customScriptStep(String stepId, String stepName, String script) {
         Property scriptContent = new Property();
         scriptContent.setName("script.content");
@@ -263,5 +257,3 @@ public final class BuildSteps {
                 .build();
     }
 }
-
-
