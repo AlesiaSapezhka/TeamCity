@@ -198,6 +198,8 @@ jobs:
           path: previous-allure-report
           workflow: tests.yml
           branch: ${{ github.ref_name }}
+          workflow_conclusion: ""
+          check_artifacts: true
           search_artifacts: true
           if_no_artifact_found: warn
 
