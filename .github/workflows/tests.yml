@@ -203,7 +203,7 @@ jobs:
           search_artifacts: true
           if_no_artifact_found: warn
 
-      # --- Layout results for generate ---------------------------------------
+      # --- Layout results for generate --------------------------------------
       - name: Assemble results and history
         run: |
           set -euo pipefail
