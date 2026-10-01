@@ -7,7 +7,7 @@ on:
 env:
   COMPOSE_FILE: infrastructure/docker_compose/docker-compose.yml
   TEAMCITY_URL: http://localhost:8111
-  # TeamCity as seen from the browser container, which joins teamcity-network
+  # TeamCity hostname as seen from the browser container (teamcity-network)
   UIBASEURL: http://teamcity-server:8111
 
 permissions:
@@ -17,11 +17,12 @@ permissions:
   id-token: write
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # 1) Run suites in parallel (each job gets its own TeamCity + Selenoid stack)
+  # ---------------------------------------------------------------------------
   test:
     name: ${{ matrix.name }}
     runs-on: ubuntu-latest
-
-    # Each entry provisions its own TeamCity stack, so all suites run in parallel
     strategy:
       fail-fast: false
       matrix:
@@ -40,6 +41,7 @@ jobs:
             browserVersion: '125.0'
 
     steps:
+      # --- Checkout & JDK ----------------------------------------------------
       - uses: actions/checkout@v4
 
       - uses: actions/setup-java@v4
@@ -48,16 +50,19 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Start TeamCity environment
+      # --- Start infrastructure ----------------------------------------------
+      # Precondition UI install always uses Chrome, so pull it for every suite.
+      - name: Start TeamCity + Selenoid
         run: |
           docker compose -f "$COMPOSE_FILE" up -d
           docker pull selenoid/vnc_chrome:128.0
 
-      - name: Pull browser image
+      - name: Pull matrix browser image
         if: matrix.browser != 'chrome'
         run: docker pull "selenoid/vnc:${{ matrix.browser }}_${{ matrix.browserVersion }}"
 
-      - name: Wait for TeamCity HTTP server
+      # --- Wait until TeamCity accepts HTTP ----------------------------------
+      - name: Wait for TeamCity HTTP
         run: |
           for i in $(seq 1 60); do
             status=$(curl -s -o /dev/null -w "%{http_code}" "$TEAMCITY_URL/mnt" || true)
@@ -68,20 +73,19 @@ jobs:
           docker compose -f "$COMPOSE_FILE" logs --tail 300 teamcity-server
           exit 1
 
-      # Super User token is resolved lazily from the container log (superuser.token=auto),
-      # because TeamCity regenerates it when the server leaves maintenance mode
+      # --- Fresh-server setup (admin user, agent, auth) ----------------------
+      # Super User token is read lazily from container logs (superuser.token=auto).
       - name: Install and configure TeamCity
         env:
           BROWSER: chrome
           BROWSERVERSION: '128.0'
         run: mvn -B --no-transfer-progress test -Dgroups=precondition -DexcludedGroups=
 
-      # Precondition writes its own Allure results (e.g. TeamCityInstallationTest).
-      # Drop them so they do not mix into api / ui-* suite reports.
+      # Precondition Allure files must not mix into the suite report.
       - name: Clear precondition Allure results
         run: rm -rf target/allure-results
 
-      - name: Wait for TeamCity readiness
+      - name: Wait for TeamCity ready
         run: |
           for i in $(seq 1 60); do
             status=$(curl -s -o /dev/null -w "%{http_code}" "$TEAMCITY_URL/healthCheck/ready" || true)
@@ -92,6 +96,7 @@ jobs:
           docker compose -f "$COMPOSE_FILE" logs --tail 300 teamcity-server
           exit 1
 
+      # --- Suite under test --------------------------------------------------
       - name: Run tests
         env:
           BROWSER: ${{ matrix.browser }}
@@ -101,7 +106,10 @@ jobs:
             test \
             -Dtest='${{ matrix.tests }}'
 
-      - name: Prepare Allure results metadata
+      # --- Package Allure results for the report job -------------------------
+      # Suffix historyId with ::suite so chrome/firefox are separate tests,
+      # not retries of each other. parentSuite only — keep package/class tree.
+      - name: Tag Allure results with suite identity
         if: always()
         run: |
           mkdir -p target/allure-results
@@ -125,10 +133,6 @@ jobs:
           }
           EOF
 
-          # Make each suite a distinct test identity. Without this, ui-chrome and
-          # ui-firefox share historyId and Allure collapses them into retries
-          # (failed run can disappear under a later passed retry).
-          # Only set parentSuite (not suite) so package/class hierarchy stays intact.
           if ls target/allure-results/*-result.json >/dev/null 2>&1; then
             for f in target/allure-results/*-result.json; do
               jq -c --arg suite "${{ matrix.name }}" --arg browser "${{ matrix.browser }}" '
@@ -145,11 +149,6 @@ jobs:
             done
           fi
 
-          echo "=== Allure results for ${{ matrix.name }} ==="
-          find target/allure-results -type f -name "*-result.json" | wc -l
-          echo "=== Statuses ==="
-          jq -r '.status' target/allure-results/*-result.json 2>/dev/null | sort | uniq -c || true
-
       - name: Upload Allure results
         if: always()
         uses: actions/upload-artifact@v4
@@ -159,26 +158,21 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Container logs
+      # --- Diagnostics & teardown --------------------------------------------
+      - name: Container logs on failure
         if: failure()
         run: |
           docker compose -f "$COMPOSE_FILE" logs --tail 500 teamcity-server
           docker compose -f "$COMPOSE_FILE" logs --tail 500 teamcity-agent
           docker compose -f "$COMPOSE_FILE" logs --tail 300 selenoid
 
-      - name: Upload Surefire results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: surefire-${{ matrix.name }}
-          path: target/surefire-reports
-          if-no-files-found: warn
-          retention-days: 7
-
       - name: Stop TeamCity environment
         if: always()
         run: docker compose -f "$COMPOSE_FILE" down -v --remove-orphans
 
+  # ---------------------------------------------------------------------------
+  # 2) Merge suite results → Allure report → GitHub Pages
+  # ---------------------------------------------------------------------------
   allure-report:
     name: Generate and Publish Allure Report
     runs-on: ubuntu-latest
@@ -190,17 +184,17 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Download Allure results from all suites
+      # --- Collect artifacts -------------------------------------------------
+      - name: Download suite Allure results
         uses: actions/download-artifact@v4
         with:
           pattern: allure-results-*
           path: allure-input
           merge-multiple: false
 
-      - name: Download previous Allure report (for history / trends)
+      - name: Download previous report history
         uses: dawidd6/action-download-artifact@v6
         continue-on-error: true
         with:
@@ -211,48 +205,21 @@ jobs:
           search_artifacts: true
           if_no_artifact_found: warn
 
-      - name: Merge results and restore history
+      # --- Layout results for generate ---------------------------------------
+      # One leaf dir per suite. Never pass the parent dir to `allure generate`
+      # together with children — that double-counts every result.
+      - name: Assemble results and history
         run: |
           set -euo pipefail
           mkdir -p allure-results
 
-          echo "=== Suites downloaded ==="
-          find allure-input -mindepth 1 -maxdepth 1 -type d | sort
-
-          # One subdirectory per suite (avoids basename clashes between jobs).
-          # Do NOT also pass the parent dir to `allure generate` — that would
-          # ingest every result twice (exact 2x suite counts).
           for suite_dir in allure-input/allure-results-*; do
             [ -d "$suite_dir" ] || continue
             suite="$(basename "$suite_dir" | sed 's/^allure-results-//')"
-            dest="allure-results/${suite}"
-            mkdir -p "$dest"
-            cp -a "$suite_dir"/. "$dest"/
-
-            if ls "$dest"/*-result.json >/dev/null 2>&1; then
-              for f in "$dest"/*-result.json; do
-                jq -c --arg suite "$suite" '
-                  .historyId = (
-                    if (.historyId // "") | endswith("::" + $suite) then .historyId
-                    else ((.historyId // .fullName // .uuid) + "::" + $suite)
-                    end
-                  )
-                  | .labels = (
-                      ((.labels // [])
-                        | map(select(.name != "parentSuite"))
-                        | map(select(.name != "suite" or .value != $suite)))
-                      + [{"name":"parentSuite","value":$suite}]
-                    )
-                ' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
-              done
-            fi
-
-            echo "=== ${suite}: $(find "$dest" -name '*-result.json' | wc -l) results ==="
-            jq -r '.status' "$dest"/*-result.json 2>/dev/null | sort | uniq -c || true
+            mkdir -p "allure-results/${suite}"
+            cp -a "$suite_dir"/. "allure-results/${suite}/"
           done
 
-          # Shared metadata lives in a sibling dir that has no *-result.json,
-          # so generate can include it without double-counting tests.
           mkdir -p allure-results/_meta
           cat > allure-results/_meta/environment.properties <<EOF
           Suites=api, ui-chrome, ui-firefox
@@ -275,42 +242,20 @@ jobs:
           }
           EOF
 
-          # Trends: previous report history (old historyIds without ::suite will
-          # simply start a new trend series — that is expected once).
           if [ -d previous-allure-report/history ]; then
-            echo "Restoring Allure history from previous run"
             cp -r previous-allure-report/history allure-results/_meta/history
-          else
-            echo "No previous Allure history found (first run or artifact expired)"
           fi
 
-          echo "=== Total results ==="
-          find allure-results -type f -name '*-result.json' | wc -l
-
+      # --- Generate ----------------------------------------------------------
       - name: Install Allure CLI
-        run: |
-          npm install -g allure-commandline@2.32.0
-          allure --version
+        run: npm install -g allure-commandline@2.32.0
 
       - name: Generate Allure report
         run: |
-          mapfile -t RESULT_DIRS < <(
-            find allure-results -mindepth 1 -maxdepth 1 -type d | sort
-          )
-          echo "Generating from: ${RESULT_DIRS[*]}"
-          # Pass only leaf dirs (api, ui-*, _meta) — never the parent allure-results
-          allure generate "${RESULT_DIRS[@]}" \
-            --clean \
-            -o allure-report
+          mapfile -t RESULT_DIRS < <(find allure-results -mindepth 1 -maxdepth 1 -type d | sort)
+          allure generate "${RESULT_DIRS[@]}" --clean -o allure-report
 
-          if [ -d allure-report/history ]; then
-            echo "Report history entries: $(find allure-report/history -type f | wc -l)"
-          fi
-
-          echo "=== parentSuite counts ==="
-          jq -r '.labels[]? | select(.name=="parentSuite") | .value' \
-            allure-results/*/*-result.json 2>/dev/null | sort | uniq -c || true
-
+      # --- Publish -----------------------------------------------------------
       - name: Upload Allure report artifact
         uses: actions/upload-artifact@v4
         with:
@@ -318,14 +263,12 @@ jobs:
           path: allure-report
           retention-days: 30
 
-      - name: Setup GitHub Pages
-        uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v5
 
-      - name: Upload GitHub Pages artifact
-        uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: allure-report
 
-      - name: Deploy Allure report to GitHub Pages
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

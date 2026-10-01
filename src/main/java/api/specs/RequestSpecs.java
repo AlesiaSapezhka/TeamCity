@@ -85,10 +85,6 @@ public final class RequestSpecs {
         return bearerSpec(user.token());
     }
 
-    public static RequestSpecification userSpec(String token) {
-        return bearerSpec(token);
-    }
-
     public static String basicAuthHeader(String username, String password) {
         String raw = (username == null ? "" : username) + ":" + (password == null ? "" : password);
         String encoded = Base64.getEncoder().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
