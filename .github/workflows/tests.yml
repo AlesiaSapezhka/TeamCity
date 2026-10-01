@@ -11,7 +11,10 @@ env:
   UIBASEURL: http://teamcity-server:8111
 
 permissions:
-  contents: write
+  contents: read
+  actions: read
+  pages: write
+  id-token: write
 
 jobs:
   test:
@@ -90,20 +93,48 @@ jobs:
           BROWSERVERSION: ${{ matrix.browserVersion }}
         run: |
           mvn -B --no-transfer-progress \
-          test \
-          -Dtest='${{ matrix.tests }}'
+            test \
+            -Dtest='${{ matrix.tests }}'
 
-      - name: Check Allure results
+      - name: Prepare Allure results metadata
         if: always()
         run: |
-          echo "=== Allure results ==="
-          ls -la target/allure-results || true
+          mkdir -p target/allure-results
 
-          echo "=== Result files ==="
-          find target/allure-results -type f -name "*-result.json" -print 2>/dev/null || true
+          cat > target/allure-results/environment.properties <<EOF
+          Suite=${{ matrix.name }}
+          Browser=${{ matrix.browser }}
+          Browser.Version=${{ matrix.browserVersion }}
+          Run.Id=${{ github.run_id }}
+          Branch=${{ github.ref_name }}
+          EOF
 
-          echo "=== Result count ==="
-          find target/allure-results -type f -name "*-result.json" 2>/dev/null | wc -l
+          cat > target/allure-results/executor.json <<EOF
+          {
+            "name": "GitHub Actions",
+            "type": "github",
+            "reportName": "TeamCity Tests",
+            "buildName": "${{ matrix.name }} #${{ github.run_number }}",
+            "buildOrder": "${{ github.run_number }}",
+            "buildUrl": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          }
+          EOF
+
+          # Label every result with the suite so api / ui-chrome / ui-firefox are separable
+          if ls target/allure-results/*-result.json >/dev/null 2>&1; then
+            for f in target/allure-results/*-result.json; do
+              jq --arg suite "${{ matrix.name }}" --arg browser "${{ matrix.browser }}" '
+                .labels = ((.labels // [])
+                  + [{"name":"parentSuite","value":$suite}]
+                  + [{"name":"suite","value":$suite}]
+                  + [{"name":"tag","value":$suite}]
+                  + [{"name":"framework","value":$browser}])
+              ' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+            done
+          fi
+
+          echo "=== Allure results for ${{ matrix.name }} ==="
+          find target/allure-results -type f -name "*-result.json" | wc -l
 
       - name: Upload Allure results
         if: always()
@@ -112,19 +143,14 @@ jobs:
           name: allure-results-${{ matrix.name }}
           path: target/allure-results
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 14
 
       - name: Container logs
         if: failure()
         run: |
-          docker compose -f "$COMPOSE_FILE" \
-            logs --tail 500 teamcity-server
-
-          docker compose -f "$COMPOSE_FILE" \
-            logs --tail 500 teamcity-agent
-
-          docker compose -f "$COMPOSE_FILE" \
-            logs --tail 300 selenoid
+          docker compose -f "$COMPOSE_FILE" logs --tail 500 teamcity-server
+          docker compose -f "$COMPOSE_FILE" logs --tail 500 teamcity-agent
+          docker compose -f "$COMPOSE_FILE" logs --tail 300 selenoid
 
       - name: Upload Surefire results
         if: always()
@@ -137,20 +163,13 @@ jobs:
 
       - name: Stop TeamCity environment
         if: always()
-        run: |
-          docker compose -f "$COMPOSE_FILE" \
-            down -v --remove-orphans
+        run: docker compose -f "$COMPOSE_FILE" down -v --remove-orphans
 
   allure-report:
     name: Generate and Publish Allure Report
     runs-on: ubuntu-latest
     needs: test
     if: always()
-
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
 
     environment:
       name: github-pages
@@ -160,79 +179,90 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download Allure results
-        uses: actions/download-artifact@v5
+      - name: Download Allure results from all suites
+        uses: actions/download-artifact@v4
         with:
           pattern: allure-results-*
-          merge-multiple: true
-          path: allure-results
+          path: allure-input
+          merge-multiple: false
 
-      - name: Inspect merged Allure results
+      - name: Download previous Allure report (for history / trends)
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          name: allure-report
+          path: previous-allure-report
+          workflow: tests.yml
+          branch: ${{ github.ref_name }}
+          search_artifacts: true
+          if_no_artifact_found: warn
+
+      - name: Merge results and restore history
         run: |
-          echo "=== Downloaded files ==="
-          find allure-results -maxdepth 1 -type f | sort
-          
-          echo "=== Result count ==="
-          find allure-results -maxdepth 1 -type f -name "*-result.json" | wc -l
-          
+          set -euo pipefail
+          mkdir -p allure-results
+
+          echo "=== Suites downloaded ==="
+          find allure-input -mindepth 1 -maxdepth 1 -type d | sort
+
+          # Flatten api + ui-chrome + ui-firefox result files into one directory.
+          # UUID filenames do not collide across matrix jobs.
+          find allure-input -type f \( \
+              -name '*-result.json' -o \
+              -name '*-container.json' -o \
+              -name '*-attachment*' -o \
+              -name '*.txt' -o \
+              -name '*.png' -o \
+              -name '*.html' -o \
+              -name '*.csv' \
+            \) -print0 | while IFS= read -r -d '' f; do
+              cp -n "$f" "allure-results/$(basename "$f")" 2>/dev/null \
+                || cp "$f" "allure-results/$(basename "$f")"
+            done
+
+          # Combined environment for the aggregate report
+          cat > allure-results/environment.properties <<EOF
+          Suites=api, ui-chrome, ui-firefox
+          Run.Id=${{ github.run_id }}
+          Run.Number=${{ github.run_number }}
+          Branch=${{ github.ref_name }}
+          Commit=${{ github.sha }}
+          Workflow=${{ github.workflow }}
+          EOF
+
+          cat > allure-results/executor.json <<EOF
+          {
+            "name": "GitHub Actions",
+            "type": "github",
+            "reportName": "TeamCity Tests",
+            "buildName": "Build #${{ github.run_number }}",
+            "buildOrder": "${{ github.run_number }}",
+            "buildUrl": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+            "reportUrl": "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          }
+          EOF
+
+          # Trends: copy history from the previous published report artifact
+          if [ -d previous-allure-report/history ]; then
+            echo "Restoring Allure history from previous run"
+            cp -r previous-allure-report/history allure-results/history
+          else
+            echo "No previous Allure history found (first run or artifact expired)"
+          fi
+
+          echo "=== Merged result count ==="
+          find allure-results -maxdepth 1 -type f -name '*-result.json' | wc -l
+
           echo "=== Statuses ==="
-          grep -h -o '"status":"[^"]*"' \
-            allure-results/*-result.json \
-            | sort | uniq -c
-          
-          echo "=== Failed tests ==="
-          grep -l '"status":"failed"' \
-            allure-results/*-result.json \
-            || true
+          grep -h -o '"status":"[^"]*"' allure-results/*-result.json 2>/dev/null | sort | uniq -c || true
 
-      - name: Inspect downloaded Allure results
-        run: |
-          echo "=== Files ==="
-          find allure-results -type f | sort
-
-          echo "=== Result count ==="
-          find allure-results -type f -name "*-result.json" | wc -l
-
-          echo "=== Statuses ==="
-          grep -h -o '"status":"[^"]*"' \
-            allure-results/*-result.json \
-            | sort | uniq -c || true
-
-          echo "=== Result names ==="
-          grep -h -o '"name":"[^"]*"' \
-            allure-results/*-result.json \
-            | head -100 || true
-
-      - name: Check downloaded Allure results
-        run: |
-          echo "=== Downloaded Allure results ==="
-          find allure-results -type f -name "*-result.json" -print
-          echo "=== Result count ==="
-          find allure-results -type f -name "*-result.json" | wc -l
+          echo "=== Suites (parentSuite labels) ==="
+          grep -h -o '"value":"\(api\|ui-chrome\|ui-firefox\)"' allure-results/*-result.json 2>/dev/null | sort | uniq -c || true
 
       - name: Install Allure CLI
         run: |
-          npm install -g allure-commandline
+          npm install -g allure-commandline@2.32.0
           allure --version
-
-      - name: Inspect Allure results
-        if: always()
-        run: |
-          echo "=== MATRIX: ${{ matrix.name }} ==="
-
-          echo "=== Surefire ==="
-          find target/surefire-reports -type f | sort | head -100 || true
-
-          echo "=== Allure ==="
-          find target/allure-results -type f | sort || true
-
-          echo "=== Result count ==="
-          find target/allure-results -type f -name "*-result.json" | wc -l || true
-
-          echo "=== Statuses ==="
-          grep -h -o '"status":"[^"]*"' \
-            target/allure-results/*-result.json \
-            | sort | uniq -c || true
 
       - name: Generate Allure report
         run: |
@@ -240,12 +270,17 @@ jobs:
             --clean \
             -o allure-report
 
+          # Keep history inside the report artifact for the next run's trends
+          if [ -d allure-report/history ]; then
+            echo "Report history entries: $(find allure-report/history -type f | wc -l)"
+          fi
+
       - name: Upload Allure report artifact
         uses: actions/upload-artifact@v4
         with:
           name: allure-report
           path: allure-report
-          retention-days: 7
+          retention-days: 30
 
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v5
