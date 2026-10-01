@@ -3,6 +3,8 @@ package ui;
 import api.BaseTest;
 import com.codeborne.selenide.Configuration;
 import com.codeborne.selenide.Selenide;
+import com.codeborne.selenide.logevents.SelenideLogger;
+import io.qameta.allure.selenide.AllureSelenide;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.parallel.Execution;
@@ -22,6 +24,12 @@ public class BaseUiTest extends BaseTest {
         Configuration.headless = false;
         Configuration.remoteConnectionTimeout = 120_000;
         Configuration.remoteReadTimeout = 120_000;
+
+        // Attach failure screenshots / page source into Allure (not only local file:// paths)
+        SelenideLogger.addListener("AllureSelenide",
+                new AllureSelenide()
+                        .screenshots(true)
+                        .savePageSource(true));
     }
 
     @AfterEach
