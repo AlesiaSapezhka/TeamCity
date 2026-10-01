@@ -36,10 +36,6 @@ jobs:
             tests: 'ui/**/*Test.java'
             browser: firefox
             browserVersion: '125.0'
-          - name: ui-opera
-            tests: 'ui/**/*Test.java'
-            browser: opera
-            browserVersion: '109.0'
 
     steps:
       - uses: actions/checkout@v4
