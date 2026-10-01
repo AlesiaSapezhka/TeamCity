@@ -120,21 +120,29 @@ jobs:
           }
           EOF
 
-          # Label every result with the suite so api / ui-chrome / ui-firefox are separable
+          # Make each suite a distinct test identity. Without this, ui-chrome and
+          # ui-firefox share historyId and Allure collapses them into retries
+          # (failed run can disappear under a later passed retry).
           if ls target/allure-results/*-result.json >/dev/null 2>&1; then
             for f in target/allure-results/*-result.json; do
-              jq --arg suite "${{ matrix.name }}" --arg browser "${{ matrix.browser }}" '
-                .labels = ((.labels // [])
-                  + [{"name":"parentSuite","value":$suite}]
-                  + [{"name":"suite","value":$suite}]
-                  + [{"name":"tag","value":$suite}]
-                  + [{"name":"framework","value":$browser}])
+              jq -c --arg suite "${{ matrix.name }}" --arg browser "${{ matrix.browser }}" '
+                .historyId = ((.historyId // .fullName // .uuid) + "::" + $suite)
+                | .labels = ((.labels // [])
+                    + [{"name":"parentSuite","value":$suite}]
+                    + [{"name":"suite","value":$suite}]
+                    + [{"name":"tag","value":$suite}]
+                    + [{"name":"language","value":$browser}])
+                | .parameters = ((.parameters // [])
+                    + [{"name":"Suite","value":$suite,"excluded":false,"mode":"default"}]
+                    + [{"name":"Browser","value":$browser,"excluded":false,"mode":"default"}])
               ' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
             done
           fi
 
           echo "=== Allure results for ${{ matrix.name }} ==="
           find target/allure-results -type f -name "*-result.json" | wc -l
+          echo "=== Statuses ==="
+          jq -r '.status' target/allure-results/*-result.json 2>/dev/null | sort | uniq -c || true
 
       - name: Upload Allure results
         if: always()
@@ -205,22 +213,32 @@ jobs:
           echo "=== Suites downloaded ==="
           find allure-input -mindepth 1 -maxdepth 1 -type d | sort
 
-          # Flatten api + ui-chrome + ui-firefox result files into one directory.
-          # UUID filenames do not collide across matrix jobs.
-          find allure-input -type f \( \
-              -name '*-result.json' -o \
-              -name '*-container.json' -o \
-              -name '*-attachment*' -o \
-              -name '*.txt' -o \
-              -name '*.png' -o \
-              -name '*.html' -o \
-              -name '*.csv' \
-            \) -print0 | while IFS= read -r -d '' f; do
-              cp -n "$f" "allure-results/$(basename "$f")" 2>/dev/null \
-                || cp "$f" "allure-results/$(basename "$f")"
-            done
+          # Copy each suite into its own subdirectory (avoids any basename clash)
+          # and re-apply unique historyId in case an older artifact lacked it.
+          for suite_dir in allure-input/allure-results-*; do
+            [ -d "$suite_dir" ] || continue
+            suite="$(basename "$suite_dir" | sed 's/^allure-results-//')"
+            dest="allure-results/${suite}"
+            mkdir -p "$dest"
+            cp -a "$suite_dir"/. "$dest"/
 
-          # Combined environment for the aggregate report
+            if ls "$dest"/*-result.json >/dev/null 2>&1; then
+              for f in "$dest"/*-result.json; do
+                jq -c --arg suite "$suite" '
+                  .historyId = (
+                    if (.historyId // "") | endswith("::" + $suite) then .historyId
+                    else ((.historyId // .fullName // .uuid) + "::" + $suite)
+                    end
+                  )
+                ' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+              done
+            fi
+
+            echo "=== ${suite}: $(find "$dest" -name '*-result.json' | wc -l) results ==="
+            jq -r '.status' "$dest"/*-result.json 2>/dev/null | sort | uniq -c || true
+          done
+
+          # Shared environment / executor for the aggregate report
           cat > allure-results/environment.properties <<EOF
           Suites=api, ui-chrome, ui-firefox
           Run.Id=${{ github.run_id }}
@@ -242,7 +260,8 @@ jobs:
           }
           EOF
 
-          # Trends: copy history from the previous published report artifact
+          # Trends: previous report history (old historyIds without ::suite will
+          # simply start a new trend series — that is expected once).
           if [ -d previous-allure-report/history ]; then
             echo "Restoring Allure history from previous run"
             cp -r previous-allure-report/history allure-results/history
@@ -250,14 +269,8 @@ jobs:
             echo "No previous Allure history found (first run or artifact expired)"
           fi
 
-          echo "=== Merged result count ==="
-          find allure-results -maxdepth 1 -type f -name '*-result.json' | wc -l
-
-          echo "=== Statuses ==="
-          grep -h -o '"status":"[^"]*"' allure-results/*-result.json 2>/dev/null | sort | uniq -c || true
-
-          echo "=== Suites (parentSuite labels) ==="
-          grep -h -o '"value":"\(api\|ui-chrome\|ui-firefox\)"' allure-results/*-result.json 2>/dev/null | sort | uniq -c || true
+          echo "=== Total results ==="
+          find allure-results -type f -name '*-result.json' | wc -l
 
       - name: Install Allure CLI
         run: |
@@ -266,14 +279,20 @@ jobs:
 
       - name: Generate Allure report
         run: |
-          allure generate allure-results \
+          # Pass each suite directory separately so nothing is lost in a flat merge
+          mapfile -t SUITE_DIRS < <(find allure-results -mindepth 1 -maxdepth 1 -type d ! -name history | sort)
+          echo "Generating from: allure-results ${SUITE_DIRS[*]}"
+          allure generate allure-results "${SUITE_DIRS[@]}" \
             --clean \
             -o allure-report
 
-          # Keep history inside the report artifact for the next run's trends
           if [ -d allure-report/history ]; then
             echo "Report history entries: $(find allure-report/history -type f | wc -l)"
           fi
+
+          echo "=== Suites in report data ==="
+          jq -r '.labels[]? | select(.name=="parentSuite") | .value' \
+            allure-results/*/*-result.json 2>/dev/null | sort | uniq -c || true
 
       - name: Upload Allure report artifact
         uses: actions/upload-artifact@v4
