@@ -10,9 +10,6 @@ import common.UserContexts;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.extension.*;
 
-/**
- * Creates per-test user + PAT in {@link ExtensionContext.Store} (not ThreadLocal).
- */
 @Order(1)
 public class CreateAndDeleteUserExtension
         implements BeforeEachCallback, AfterEachCallback, ParameterResolver {

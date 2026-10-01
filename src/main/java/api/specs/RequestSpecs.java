@@ -14,10 +14,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 
-/**
- * Stateless request specs. User Bearer comes from {@link UserContext#token()}
- * (ExtensionContext.Store) — not ThreadLocal (ForkJoinPool may switch threads).
- */
 public final class RequestSpecs {
 
     private RequestSpecs() {

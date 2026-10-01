@@ -4,10 +4,6 @@ import common.extensions.CreateAndDeleteUserExtension;
 import common.extensions.CreateUserAndLogInExtension;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
-/**
- * Resolves {@link UserContext} from user extensions' ExtensionContext.Store
- * (thread-safe across ForkJoinPool workers).
- */
 public final class UserContexts {
 
     public static final String STORE_KEY = "userContext";

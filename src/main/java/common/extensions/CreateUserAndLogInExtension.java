@@ -11,9 +11,6 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.extension.*;
 import ui.pages.LoginPage;
 
-/**
- * Creates per-test user + PAT in store and logs in via UI.
- */
 @Order(1)
 public class CreateUserAndLogInExtension
         implements BeforeEachCallback, AfterEachCallback, ParameterResolver {

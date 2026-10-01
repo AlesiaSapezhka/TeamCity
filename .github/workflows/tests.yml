@@ -7,7 +7,6 @@ on:
 env:
   COMPOSE_FILE: infrastructure/docker_compose/docker-compose.yml
   TEAMCITY_URL: http://localhost:8111
-  # TeamCity hostname as seen from the browser container (teamcity-network)
   UIBASEURL: http://teamcity-server:8111
 
 permissions:
@@ -107,8 +106,6 @@ jobs:
             -Dtest='${{ matrix.tests }}'
 
       # --- Package Allure results for the report job -------------------------
-      # Suffix historyId with ::suite so chrome/firefox are separate tests,
-      # not retries of each other. parentSuite only — keep package/class tree.
       - name: Tag Allure results with suite identity
         if: always()
         run: |
@@ -158,7 +155,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      # --- Diagnostics & teardown --------------------------------------------
       - name: Container logs on failure
         if: failure()
         run: |
@@ -206,8 +202,6 @@ jobs:
           if_no_artifact_found: warn
 
       # --- Layout results for generate ---------------------------------------
-      # One leaf dir per suite. Never pass the parent dir to `allure generate`
-      # together with children — that double-counts every result.
       - name: Assemble results and history
         run: |
           set -euo pipefail

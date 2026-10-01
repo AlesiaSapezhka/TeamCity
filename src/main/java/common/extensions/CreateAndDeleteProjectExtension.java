@@ -9,9 +9,7 @@ import common.UserContexts;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.extension.*;
 
-/**
- * Creates project with the user from {@link UserContexts} (same ExtensionContext.Store).
- */
+
 @Order(10)
 public class CreateAndDeleteProjectExtension
         implements BeforeEachCallback, AfterEachCallback, ParameterResolver {
