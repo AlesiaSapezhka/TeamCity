@@ -2,6 +2,8 @@ package api.specs;
 
 import api.configs.Config;
 import api.configs.SuperUserTokenResolver;
+import common.UserContext;
+import io.qameta.allure.restassured.AllureRestAssured;
 import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.filter.log.RequestLoggingFilter;
 import io.restassured.filter.log.ResponseLoggingFilter;
@@ -12,19 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 
-/**
- * Auth cases use different RequestSpecs
- * <p>
- * Valid Bearer — {@code @User} + {@link api.specs.RequestSpecs#userSpec()}
- * Invalid Bearer — {@link api.specs.RequestSpecs#bearerSpec(String)} (no {@code @User})
- * No auth — {@link api.specs.RequestSpecs#baseSpec()} (no {@code @User})
- * Basic login — {@link api.specs.RequestSpecs#authAsUserSpec(String, String)}=
- * Super User — {@link api.specs.RequestSpecs#superUserSpec()} (create user only)
- */
-
 public final class RequestSpecs {
-
-    private static String userToken;
 
     private RequestSpecs() {
     }
@@ -44,7 +34,8 @@ public final class RequestSpecs {
                 .setAccept(ContentType.JSON)
                 .addFilters(List.of(
                         new RequestLoggingFilter(),
-                        new ResponseLoggingFilter()
+                        new ResponseLoggingFilter(),
+                        new AllureRestAssured()
                 ))
                 .setBaseUri(baseUrl + restPath);
     }
@@ -61,9 +52,6 @@ public final class RequestSpecs {
         return defaultRequestBuilder().build();
     }
 
-    /**
-     * Super User: пустой username + token из teamcity-server.log
-     */
     public static RequestSpecification superUserSpec() {
         return defaultRequestBuilder("/httpAuth/app/rest")
                 .addHeader("Authorization", basicAuthHeader("", SuperUserTokenResolver.resolve()))
@@ -86,20 +74,11 @@ public final class RequestSpecs {
                 .build();
     }
 
-    public static void setUserToken(String token) {
-        if (token == null || token.isBlank()) {
-            throw new IllegalStateException("Cannot set empty user token");
+    public static RequestSpecification userSpec(UserContext user) {
+        if (user == null || user.token() == null || user.token().isBlank()) {
+            throw new IllegalStateException("UserContext.token is null/empty");
         }
-        userToken = token.startsWith("Bearer ") ? token.substring("Bearer ".length()).trim() : token.trim();
-    }
-
-    public static RequestSpecification userSpec() {
-        if (userToken == null || userToken.isBlank()) {
-            throw new IllegalStateException(
-                    "Test user token is not set. Annotate the test with @User first."
-            );
-        }
-        return bearerSpec(userToken);
+        return bearerSpec(user.token());
     }
 
     public static String basicAuthHeader(String username, String password) {

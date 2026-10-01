@@ -8,6 +8,7 @@ import api.requesters.ValidatedCrudRequester;
 import api.requesters.interfaces.Endpoints;
 import api.specs.RequestSpecs;
 import api.specs.ResponseSpecs;
+import common.UserContext;
 import io.restassured.response.ValidatableResponse;
 
 import java.util.List;
@@ -16,7 +17,7 @@ import java.util.Map;
 /**
  * Create/delete users — via Super User ({@link RequestSpecs#superUserSpec()}).
  * Tokens — via the user themselves (Basic username:password).
- * Current user — via test user Bearer ({@link RequestSpecs#userSpec()}).
+ * Current user — via Bearer from {@link UserContext#token()}.
  */
 public final class UserSteps {
     private static final String BAD_REQUEST_STATUS_TEXT = "Responding with error, status code: 400 (Bad Request).";
@@ -28,6 +29,28 @@ public final class UserSteps {
 
     public static CreateUserRequest buildUserValid() {
         return RandomModelGenerator.generate(CreateUserRequest.class);
+    }
+
+    /**
+     * Idempotent: the wizard may or may not have created the account already.
+     */
+    public static void ensureUserExists(String username, String password) {
+        int status = new CrudRequester(
+                RequestSpecs.superUserSpec(),
+                Endpoints.USER,
+                ResponseSpecs.anyStatus()
+        ).get(Map.of("userLocator", "username:" + username))
+                .extract()
+                .statusCode();
+
+        if (status == 200) {
+            return;
+        }
+
+        createUserValid(CreateUserRequest.builder()
+                .username(username)
+                .password(password)
+                .build());
     }
 
     public static UserResponse createUserValid(CreateUserRequest request) {
@@ -106,9 +129,9 @@ public final class UserSteps {
         ).get(Map.of("userLocator", "username:" + request.getUsername()));
     }
 
-    public static UserResponse getCurrentUser() {
+    public static UserResponse getCurrentUser(UserContext user) {
         return new ValidatedCrudRequester<UserResponse>(
-                RequestSpecs.userSpec(),
+                RequestSpecs.userSpec(user),
                 Endpoints.CURRENT_USER,
                 ResponseSpecs.requestReturnsOK()
         ).get();

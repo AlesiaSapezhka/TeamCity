@@ -8,8 +8,8 @@ import api.models.build_type.BuildTypeResponse;
 import api.models.build_type.CreateBuildTypeRequest;
 import api.steps.BuildSteps;
 import common.ProjectContext;
-import common.annotations.CreateUserAndLogIn;
 import common.annotations.CreateAndDeleteProject;
+import common.annotations.CreateUserAndLogIn;
 import org.junit.jupiter.api.Test;
 import ui.pages.MainPage;
 
@@ -53,7 +53,11 @@ public class CreateBuildTest extends BaseUiTest {
                 .buildSettingsUpdates()
                 .shouldHaveBuildSteps(buildStepRequest.getName(), command);
 
-        BuildTypeResponse build = BuildSteps.getBuildByName(project.projectId(), buildRequest.getName());
+        BuildTypeResponse build = BuildSteps.getBuildByName(
+                project.projectId(),
+                buildRequest.getName(),
+                project.user()
+        );
         BuildSteps.assertBuildStep(
                 build,
                 build.getId(),

@@ -15,6 +15,6 @@ public class CreateBuildStepRequest extends BaseModel {
     @GeneratingRule(regex = "Build_Step_[A-Z][a-z]{3}")
     private String name;
     private String type;
-    private Boolean disabled;
+    private Boolean disabled = false;
     private Properties properties;
 }

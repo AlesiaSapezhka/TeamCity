@@ -5,10 +5,13 @@ ${project.build.directory}/
 !**/src/main/**/target/
 !**/src/test/**/target/
 .kotlin
-.build/reports/tests
+build/reports/tests
 
 ### IntelliJ IDEA ###
 .idea
+
+### VS Code ###
+.vscode/
 
 ### Allure ###
 allure-results/

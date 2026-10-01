@@ -26,16 +26,14 @@ public enum Endpoints {
     AUTH_SETTINGS("/server/authSettings", AuthSettingsRequest.class, BaseModel.class),
     AGENT("/agents/{agentLocator}", BaseModel.class, AgentResponse.class),
     AGENTS("/agents", BaseModel.class, AgentResponse.class),
-    ENABLE_AGENT("/agents/{agentLocator}/enabledInfo", BaseModel.class, BaseModel.class),
+    AGENTS_ANY("/agents?locator=authorized:any,connected:any,enabled:any", BaseModel.class, AgentResponse.class),
+    AGENT_AUTHORIZED("/agents/{agentLocator}/authorizedInfo", BaseModel.class, AgentResponse.class),
+    ENABLE_AGENT("/agents/{agentLocator}/enabledInfo", BaseModel.class, AgentResponse.class),
     PROJECTS("/projects", CreateProjectRequest.class, ProjectResponse.class),
     PROJECT("/projects/{projectLocator}", BaseModel.class, ProjectResponse.class),
     BUILD_TYPES("/buildTypes", CreateBuildTypeRequest.class, BuildTypeResponse.class),
     BUILD_TYPE("/buildTypes/{btLocator}", BaseModel.class, BuildTypeResponse.class),
-    BUILD_TYPE_STEPS(
-            "/buildTypes/{btLocator}/steps",
-            CreateBuildStepRequest.class,
-            BuildStepResponse.class
-    ),
+    BUILD_TYPE_STEPS("/buildTypes/{btLocator}/steps", CreateBuildStepRequest.class, BuildStepResponse.class),
     BUILD_QUEUE("/buildQueue", RunBuildRequest.class, BuildResponse.class),
     BUILD("/builds/{buildLocator}", BaseModel.class, BuildResponse.class);
 

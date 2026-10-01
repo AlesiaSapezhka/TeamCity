@@ -3,16 +3,15 @@ package api.configs;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Super User token меняется при каждом старте TeamCity.
- * Читается из лог-файла внутри Docker-контейнера (не через полный {@code docker logs}).
- */
+import static org.awaitility.Awaitility.await;
+
 public final class SuperUserTokenResolver {
 
     private static final Pattern TOKEN_PATTERN = Pattern.compile(
@@ -20,14 +19,20 @@ public final class SuperUserTokenResolver {
             Pattern.CASE_INSENSITIVE
     );
 
+    private static final Duration TOKEN_TIMEOUT = Duration.ofMinutes(4);
+    private static final Duration POLL_INTERVAL = Duration.ofSeconds(5);
+
     private static String cachedToken;
 
     private SuperUserTokenResolver() {
     }
 
-    public static String resolve() {
+    public static synchronized String resolve() {
         String configured = Config.getProperty("superuser.token");
-        if (configured != null && !configured.isBlank() && !"auto".equalsIgnoreCase(configured.trim())) {
+
+        if (configured != null
+                && !configured.isBlank()
+                && !"auto".equalsIgnoreCase(configured.trim())) {
             return configured.trim();
         }
 
@@ -35,12 +40,39 @@ public final class SuperUserTokenResolver {
             return cachedToken;
         }
 
-        String container = Config.getProperty("superuser.docker.container");
+        String container = Config.getProperty(
+                "superuser.docker.container"
+        );
+
         if (container == null || container.isBlank()) {
             container = "teamcity-server";
         }
 
-        cachedToken = readFromContainerLogFile(container.trim());
+        String finalContainer = container.trim();
+
+        await()
+                .atMost(TOKEN_TIMEOUT)
+                .pollInterval(POLL_INTERVAL)
+                .until(() -> {
+                    cachedToken = readToken(finalContainer);
+
+                    if (cachedToken != null) {
+                        System.out.println(
+                                "Super User token found for container '"
+                                        + finalContainer
+                                        + "'"
+                        );
+                        return true;
+                    }
+
+                    System.out.println(
+                            "Super User token is not available yet. "
+                                    + "Waiting..."
+                    );
+
+                    return false;
+                });
+
         return cachedToken;
     }
 
@@ -48,16 +80,26 @@ public final class SuperUserTokenResolver {
         cachedToken = null;
     }
 
-    private static String readFromContainerLogFile(String container) {
+    private static String readToken(String container) {
         List<String> commands = List.of(
-                "grep -i 'Super user authentication token' /opt/teamcity/logs/teamcity-server.log | tail -1",
-                "grep -i 'Super user authentication token' /opt/teamcity/logs/teamcity-startup.log | tail -1"
+                "grep -i 'Super user authentication token' "
+                        + "/opt/teamcity/logs/teamcity-server.log "
+                        + "| tail -1",
+
+                "grep -i 'Super user authentication token' "
+                        + "/opt/teamcity/logs/teamcity-startup.log "
+                        + "| tail -1"
         );
 
         List<String> errors = new ArrayList<>();
+
         for (String command : commands) {
             try {
-                String token = runDockerExec(container, command);
+                String token = runDockerExec(
+                        container,
+                        command
+                );
+
                 if (token != null) {
                     return token;
                 }
@@ -68,6 +110,7 @@ public final class SuperUserTokenResolver {
 
         try {
             String token = runDockerLogsTail(container);
+
             if (token != null) {
                 return token;
             }
@@ -75,63 +118,120 @@ public final class SuperUserTokenResolver {
             errors.add(e.getMessage());
         }
 
-        throw new IllegalStateException(
-                "Super user token not found for container '" + container + "'. "
-                        + "Set superuser.token manually or check superuser.docker.container. "
-                        + "Details: " + String.join("; ", errors)
-        );
+        return null;
     }
 
-    private static String runDockerExec(String container, String shellCommand) throws Exception {
-        ProcessBuilder pb = new ProcessBuilder(
-                "docker", "exec", container, "sh", "-c", shellCommand
+    private static String runDockerExec(
+            String container,
+            String shellCommand
+    ) throws Exception {
+
+        ProcessBuilder processBuilder = new ProcessBuilder(
+                "docker",
+                "exec",
+                container,
+                "sh",
+                "-c",
+                shellCommand
         );
-        pb.redirectErrorStream(true);
-        Process process = pb.start();
-        String output = readProcessOutput(process, 15);
-        int exit = process.exitValue();
-        if (exit != 0 && (output == null || output.isBlank())) {
+
+        processBuilder.redirectErrorStream(true);
+
+        Process process = processBuilder.start();
+
+        String output = readProcessOutput(
+                process,
+                15
+        );
+
+        int exitCode = process.exitValue();
+
+        if (exitCode != 0
+                && (output == null || output.isBlank())) {
             return null;
         }
+
         return extractLastToken(output);
     }
 
-    private static String runDockerLogsTail(String container) throws Exception {
-        ProcessBuilder pb = new ProcessBuilder(
-                "docker", "logs", "--tail", "5000", container
+    private static String runDockerLogsTail(
+            String container
+    ) throws Exception {
+
+        ProcessBuilder processBuilder = new ProcessBuilder(
+                "docker",
+                "logs",
+                "--tail",
+                "5000",
+                container
         );
-        pb.redirectErrorStream(true);
-        Process process = pb.start();
-        String output = readProcessOutput(process, 20);
+
+        processBuilder.redirectErrorStream(true);
+
+        Process process = processBuilder.start();
+
+        String output = readProcessOutput(
+                process,
+                20
+        );
+
         return extractLastToken(output);
     }
 
-    private static String readProcessOutput(Process process, int timeoutSeconds) throws Exception {
+    private static String readProcessOutput(
+            Process process,
+            int timeoutSeconds
+    ) throws Exception {
+
         StringBuilder output = new StringBuilder();
+
         try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                new InputStreamReader(
+                        process.getInputStream(),
+                        StandardCharsets.UTF_8
+                ))) {
+
             String line;
+
             while ((line = reader.readLine()) != null) {
                 output.append(line).append('\n');
             }
         }
-        boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+
+        boolean finished = process.waitFor(
+                timeoutSeconds,
+                TimeUnit.SECONDS
+        );
+
         if (!finished) {
             process.destroyForcibly();
-            throw new IllegalStateException("Timeout after " + timeoutSeconds + "s");
+
+            throw new IllegalStateException(
+                    "Timeout after "
+                            + timeoutSeconds
+                            + "s"
+            );
         }
+
         return output.toString();
     }
 
-    private static String extractLastToken(String output) {
+    private static String extractLastToken(
+            String output
+    ) {
+
         if (output == null || output.isBlank()) {
             return null;
         }
+
         String lastToken = null;
+
         Matcher matcher = TOKEN_PATTERN.matcher(output);
+
         while (matcher.find()) {
             lastToken = matcher.group(1);
         }
+
         return lastToken;
     }
 }

@@ -79,6 +79,9 @@ public class RandomModelGenerator {
         } else if (type.equals(Double.class) || type.equals(double.class)) {
             return RANDOM.nextDouble() * 100;
         } else if (type.equals(Boolean.class) || type.equals(boolean.class)) {
+            if (field.getName().equals("disabled")) {
+                return false;
+            }
             return RANDOM.nextBoolean();
         } else if (type.equals(List.class)) {
             return generateRandomList(field);

@@ -20,6 +20,10 @@ public class RunBuildPage extends BasePage<RunBuildPage> {
     private final SelenideElement stopBuildComment = $("#removeQueuedBuildComment");
     private final SelenideElement submitStopBuildButton = $("#submitRemoveQueuedBuild");
     private final SelenideElement buildLogTab = $("a[data-test='ring-link'][aria-label='Build Log']");
+    private final SelenideElement canceledIcon =
+            $("[data-test='ring-icon'][data-test-icon='canceled']");
+    private final SelenideElement buildRow =
+            $("button[data-test='details-summary'][aria-label='Build']");
 
     private SelenideElement stepLog(String stepName) {
         return $x("//div[@data-test-log-message='true']"
@@ -41,12 +45,6 @@ public class RunBuildPage extends BasePage<RunBuildPage> {
         return $x("//div[@data-test='log-message-text' and contains(normalize-space(.), '%s')]"
                 .formatted(command));
     }
-
-    private final SelenideElement canceledIcon =
-            $("[data-test='ring-icon'][data-test-icon='canceled']");
-
-    private final SelenideElement buildRow =
-            $("button[data-test='details-summary'][aria-label='Build']");
 
     @Override
     public String url() {

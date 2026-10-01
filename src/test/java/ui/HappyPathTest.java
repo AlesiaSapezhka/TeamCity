@@ -13,7 +13,7 @@ import common.annotations.EnableAgent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.ResourceAccessMode;
 import org.junit.jupiter.api.parallel.ResourceLock;
-import ui.pages.*;
+import ui.pages.LoginPage;
 
 public class HappyPathTest extends BaseUiTest {
 
@@ -75,6 +75,6 @@ public class HappyPathTest extends BaseUiTest {
                 .refreshPage()
                 .shouldContainCommand(command.parameters());
 
-        ProjectSteps.deleteProject(projectRequest.getId());
+        ProjectSteps.deleteProject(projectRequest.getId(), user);
     }
 }

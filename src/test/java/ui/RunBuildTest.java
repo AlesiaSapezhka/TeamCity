@@ -9,9 +9,9 @@ import api.models.build_type.CreateBuildTypeRequest;
 import api.steps.BuildSteps;
 import common.ProjectContext;
 import common.UserContext;
+import common.annotations.CreateAndDeleteProject;
 import common.annotations.CreateUserAndLogIn;
 import common.annotations.EnableAgent;
-import common.annotations.CreateAndDeleteProject;
 import common.data.BuildInfo;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.ResourceAccessMode;
@@ -33,12 +33,12 @@ public class RunBuildTest extends BaseUiTest {
     void userCanRunExistingBuild(ProjectContext project) {
         CreateBuildTypeRequest buildRequest = BuildSteps.buildValid(project.projectId());
         BuildTypeResponse buildResponse =
-                BuildSteps.createBuild(buildRequest);
+                BuildSteps.createBuild(buildRequest, project.user());
         String buildTypeId = buildResponse.getId();
 
         CommandLineCommand command = BuildCommands.randomCommandLineCommand();
         CreateBuildStepRequest buildStepRequest = BuildSteps.commandLine(command);
-        BuildSteps.addBuildStep(buildTypeId, buildStepRequest);
+        BuildSteps.addBuildStep(buildTypeId, buildStepRequest, project.user());
 
         new MainPage()
                 .open()
@@ -67,12 +67,12 @@ public class RunBuildTest extends BaseUiTest {
     void userCanInterruptBuildRun(UserContext user, ProjectContext project) {
         CreateBuildTypeRequest buildRequest = BuildSteps.buildValid(project.projectId());
         BuildTypeResponse buildResponse =
-                BuildSteps.createBuild(buildRequest);
+                BuildSteps.createBuild(buildRequest, project.user());
         String buildTypeId = buildResponse.getId();
 
         CommandLineCommand command = BuildCommands.randomCommandLineCommand();
         CreateBuildStepRequest buildStepRequest = BuildSteps.commandLine(command);
-        BuildSteps.addBuildStep(buildTypeId, buildStepRequest);
+        BuildSteps.addBuildStep(buildTypeId, buildStepRequest, project.user());
 
         new MainPage()
                 .open()
@@ -106,12 +106,12 @@ public class RunBuildTest extends BaseUiTest {
 
         CreateBuildTypeRequest buildRequest = BuildSteps.buildValid(project.projectId());
         BuildTypeResponse buildResponse =
-                BuildSteps.createBuild(buildRequest);
+                BuildSteps.createBuild(buildRequest, project.user());
         String buildTypeId = buildResponse.getId();
 
         CommandLineCommand command = BuildCommands.randomCommandLineCommand();
         CreateBuildStepRequest buildStepRequest = BuildSteps.commandLine(command);
-        BuildSteps.addBuildStep(buildTypeId, buildStepRequest);
+        BuildSteps.addBuildStep(buildTypeId, buildStepRequest, project.user());
 
         new MainPage()
                 .open()
