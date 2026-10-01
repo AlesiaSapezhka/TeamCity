@@ -36,6 +36,10 @@ jobs:
             tests: 'ui/**/*Test.java'
             browser: firefox
             browserVersion: '125.0'
+          - name: ui-opera
+            tests: 'ui/**/*Test.java'
+            browser: opera
+            browserVersion: '109.0'
 
     steps:
       - uses: actions/checkout@v4
@@ -99,10 +103,10 @@ jobs:
         run: |
           echo "=== Allure results ==="
           ls -la target/allure-results || true
-          
+
           echo "=== Result files ==="
           find target/allure-results -type f -name "*-result.json" -print 2>/dev/null || true
-          
+
           echo "=== Result count ==="
           find target/allure-results -type f -name "*-result.json" 2>/dev/null | wc -l
 
@@ -120,10 +124,10 @@ jobs:
         run: |
           docker compose -f "$COMPOSE_FILE" \
             logs --tail 500 teamcity-server
-          
+
           docker compose -f "$COMPOSE_FILE" \
             logs --tail 500 teamcity-agent
-          
+
           docker compose -f "$COMPOSE_FILE" \
             logs --tail 300 selenoid
 
@@ -183,11 +187,11 @@ jobs:
       - name: Restore previous Allure history
         run: |
           git fetch origin gh-pages || true
-          
+
           if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
             mkdir -p previous-report
             git archive origin/gh-pages | tar -x -C previous-report
-          
+
             if [ -d previous-report/history ]; then
               cp -R previous-report/history allure-results/
             fi
