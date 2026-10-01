@@ -76,6 +76,11 @@ jobs:
           BROWSERVERSION: '128.0'
         run: mvn -B --no-transfer-progress test -Dgroups=precondition -DexcludedGroups=
 
+      # Precondition writes its own Allure results (e.g. TeamCityInstallationTest).
+      # Drop them so they do not mix into api / ui-* suite reports.
+      - name: Clear precondition Allure results
+        run: rm -rf target/allure-results
+
       - name: Wait for TeamCity readiness
         run: |
           for i in $(seq 1 60); do
@@ -123,15 +128,16 @@ jobs:
           # Make each suite a distinct test identity. Without this, ui-chrome and
           # ui-firefox share historyId and Allure collapses them into retries
           # (failed run can disappear under a later passed retry).
+          # Only set parentSuite (not suite) so package/class hierarchy stays intact.
           if ls target/allure-results/*-result.json >/dev/null 2>&1; then
             for f in target/allure-results/*-result.json; do
               jq -c --arg suite "${{ matrix.name }}" --arg browser "${{ matrix.browser }}" '
                 .historyId = ((.historyId // .fullName // .uuid) + "::" + $suite)
-                | .labels = ((.labels // [])
+                | .labels = (
+                    ((.labels // []) | map(select(.name != "parentSuite")))
                     + [{"name":"parentSuite","value":$suite}]
-                    + [{"name":"suite","value":$suite}]
                     + [{"name":"tag","value":$suite}]
-                    + [{"name":"language","value":$browser}])
+                  )
                 | .parameters = ((.parameters // [])
                     + [{"name":"Suite","value":$suite,"excluded":false,"mode":"default"}]
                     + [{"name":"Browser","value":$browser,"excluded":false,"mode":"default"}])
@@ -213,8 +219,9 @@ jobs:
           echo "=== Suites downloaded ==="
           find allure-input -mindepth 1 -maxdepth 1 -type d | sort
 
-          # Copy each suite into its own subdirectory (avoids any basename clash)
-          # and re-apply unique historyId in case an older artifact lacked it.
+          # One subdirectory per suite (avoids basename clashes between jobs).
+          # Do NOT also pass the parent dir to `allure generate` — that would
+          # ingest every result twice (exact 2x suite counts).
           for suite_dir in allure-input/allure-results-*; do
             [ -d "$suite_dir" ] || continue
             suite="$(basename "$suite_dir" | sed 's/^allure-results-//')"
@@ -230,6 +237,12 @@ jobs:
                     else ((.historyId // .fullName // .uuid) + "::" + $suite)
                     end
                   )
+                  | .labels = (
+                      ((.labels // [])
+                        | map(select(.name != "parentSuite"))
+                        | map(select(.name != "suite" or .value != $suite)))
+                      + [{"name":"parentSuite","value":$suite}]
+                    )
                 ' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
               done
             fi
@@ -238,8 +251,10 @@ jobs:
             jq -r '.status' "$dest"/*-result.json 2>/dev/null | sort | uniq -c || true
           done
 
-          # Shared environment / executor for the aggregate report
-          cat > allure-results/environment.properties <<EOF
+          # Shared metadata lives in a sibling dir that has no *-result.json,
+          # so generate can include it without double-counting tests.
+          mkdir -p allure-results/_meta
+          cat > allure-results/_meta/environment.properties <<EOF
           Suites=api, ui-chrome, ui-firefox
           Run.Id=${{ github.run_id }}
           Run.Number=${{ github.run_number }}
@@ -248,7 +263,7 @@ jobs:
           Workflow=${{ github.workflow }}
           EOF
 
-          cat > allure-results/executor.json <<EOF
+          cat > allure-results/_meta/executor.json <<EOF
           {
             "name": "GitHub Actions",
             "type": "github",
@@ -264,7 +279,7 @@ jobs:
           # simply start a new trend series — that is expected once).
           if [ -d previous-allure-report/history ]; then
             echo "Restoring Allure history from previous run"
-            cp -r previous-allure-report/history allure-results/history
+            cp -r previous-allure-report/history allure-results/_meta/history
           else
             echo "No previous Allure history found (first run or artifact expired)"
           fi
@@ -279,10 +294,12 @@ jobs:
 
       - name: Generate Allure report
         run: |
-          # Pass each suite directory separately so nothing is lost in a flat merge
-          mapfile -t SUITE_DIRS < <(find allure-results -mindepth 1 -maxdepth 1 -type d ! -name history | sort)
-          echo "Generating from: allure-results ${SUITE_DIRS[*]}"
-          allure generate allure-results "${SUITE_DIRS[@]}" \
+          mapfile -t RESULT_DIRS < <(
+            find allure-results -mindepth 1 -maxdepth 1 -type d | sort
+          )
+          echo "Generating from: ${RESULT_DIRS[*]}"
+          # Pass only leaf dirs (api, ui-*, _meta) — never the parent allure-results
+          allure generate "${RESULT_DIRS[@]}" \
             --clean \
             -o allure-report
 
@@ -290,7 +307,7 @@ jobs:
             echo "Report history entries: $(find allure-report/history -type f | wc -l)"
           fi
 
-          echo "=== Suites in report data ==="
+          echo "=== parentSuite counts ==="
           jq -r '.labels[]? | select(.name=="parentSuite") | .value' \
             allure-results/*/*-result.json 2>/dev/null | sort | uniq -c || true
 
