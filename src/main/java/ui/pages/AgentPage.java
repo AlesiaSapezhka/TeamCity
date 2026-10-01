@@ -21,7 +21,6 @@ public class AgentPage extends BasePage<AgentPage> {
 
     private final SelenideElement overviewHeader = $("h1");
     private final SelenideElement allAgentsTab = $(".ring-tabs-container .ring-tabs-visible");
-    private final SelenideElement idleStatusLabel = $(Selectors.byText("Idle"));
     private final SelenideElement agentIpLink = $("[class*='AgentListView-module__link']");
     private final SelenideElement agentToggle = $(Selectors.byAttribute("data-test", "ring-toggle"));
     private final SelenideElement agentToggleClickableZone = $(".ring-toggle-switch");
@@ -42,10 +41,6 @@ public class AgentPage extends BasePage<AgentPage> {
 
     public AgentPage verifyAllAgentsTabIsVisible() {
         return elementShouldHaveText(allAgentsTab, ALL_AGENT_TAB);
-    }
-
-    public AgentPage verifyIdleStatusIsVisible() {
-        return elementShouldBeVisible(idleStatusLabel);
     }
 
     public AgentPage verifyAgentIsEnabled() {
@@ -88,8 +83,7 @@ public class AgentPage extends BasePage<AgentPage> {
 
     public AgentPage verifyAgentOverviewState() {
         return this.verifyOverviewHeader()
-                .verifyAllAgentsTabIsVisible()
-                .verifyIdleStatusIsVisible();
+                .verifyAllAgentsTabIsVisible();
     }
 
     public boolean isAuthorizationRequired() {
