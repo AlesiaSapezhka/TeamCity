@@ -1,0 +1,69 @@
+package api;
+
+import api.models.user.TokenResponse;
+import api.steps.AgentSteps;
+import api.steps.AuthSteps;
+import api.steps.UserSteps;
+import common.UserContext;
+import common.data.TeamCityAdminData;
+import org.junit.jupiter.api.*;
+import ui.BaseUiTest;
+import ui.steps.AgentUiSteps;
+import ui.steps.TeamCityInstallationSteps;
+
+/**
+ * Environment precondition: runs once against a freshly started TeamCity stack
+ */
+@Tag("precondition")
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+public class TeamCityInstallationTest extends BaseUiTest {
+
+    @Test
+    @Order(1)
+    void setUpTeamCity() {
+        TeamCityInstallationSteps.install();
+    }
+
+    @Test
+    @Order(2)
+    void setUpAgent() {
+        AuthSteps.ensurePerProjectPermissions();
+
+        UserSteps.ensureUserExists(
+                TeamCityAdminData.USERNAME,
+                TeamCityAdminData.PASSWORD
+        );
+
+        UserSteps.grantSystemAdmin(
+                TeamCityAdminData.USERNAME
+        );
+
+        TokenResponse token =
+                UserSteps.createToken(
+                        TeamCityAdminData.USERNAME,
+                        TeamCityAdminData.PASSWORD
+                );
+
+        if (token.getValue() == null
+                || token.getValue().isBlank()) {
+
+            throw new IllegalStateException(
+                    "Admin token is empty"
+            );
+        }
+
+        UserContext admin = new UserContext(
+                null,
+                TeamCityAdminData.USERNAME,
+                TeamCityAdminData.PASSWORD,
+                token.getValue()
+        );
+
+        AgentUiSteps.authorizeAgent();
+        AgentSteps.ensureAgentReady(admin);
+
+        AgentSteps.assertAgentReady(
+                AgentSteps.findAgent(admin)
+        );
+    }
+}

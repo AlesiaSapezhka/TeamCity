@@ -1,0 +1,69 @@
+services:
+
+  teamcity-server:
+    image: jetbrains/teamcity-server:2026.2
+    container_name: teamcity-server
+    ports:
+      - "8111:8111"
+    volumes:
+      - teamcity-server-data:/data/teamcity_server/datadir
+      - teamcity-server-logs:/opt/teamcity/logs
+    networks:
+      - teamcity-network
+
+  teamcity-agent:
+    image: jetbrains/teamcity-agent:2026.2-linux-sudo
+    container_name: teamcity-agent
+    environment:
+      SERVER_URL: http://teamcity-server:8111
+      AGENT_NAME: teamcity-agent
+    depends_on:
+      - teamcity-server
+    volumes:
+      - teamcity-agent-conf:/data/teamcity_agent/conf
+    networks:
+      - teamcity-network
+
+  selenoid:
+    image: aerokube/selenoid:1.11.3
+    container_name: selenoid
+    ports:
+      - "4444:4444"
+    environment:
+      DOCKER_API_VERSION: "1.44"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./selenoid:/etc/selenoid:ro
+    command:
+      - "-conf"
+      - "/etc/selenoid/browsers.json"
+      - "-container-network"
+      - "teamcity-network"
+    networks:
+      - teamcity-network
+
+  selenoid-ui:
+    image: aerokube/selenoid-ui:latest
+    container_name: selenoid-ui
+    ports:
+      - "8080:8080"
+    command:
+      - "--selenoid-uri"
+      - "http://selenoid:4444"
+    depends_on:
+      - selenoid
+    networks:
+      - teamcity-network
+
+
+volumes:
+
+  teamcity-server-data:
+  teamcity-server-logs:
+  teamcity-agent-conf:
+
+networks:
+
+  teamcity-network:
+    name: teamcity-network
+

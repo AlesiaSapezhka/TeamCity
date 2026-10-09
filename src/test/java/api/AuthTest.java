@@ -13,8 +13,8 @@ public class AuthTest extends BaseTest {
     @Test
     @CreateAndDeleteUser
     void userCanAccessProtectedEndpointWithValidToken(UserContext user) {
-        AuthSteps.authAsUser();
-        assertEquals(user.username(), UserSteps.getCurrentUser().getUsername());
+        AuthSteps.authAsUser(user);
+        assertEquals(user.username(), UserSteps.getCurrentUser(user).getUsername());
     }
 
     @Test

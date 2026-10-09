@@ -21,6 +21,10 @@ public final class ResponseSpecs {
                 .build();
     }
 
+    public static ResponseSpecification anyStatus() {
+        return defaultResponseBuilder().build();
+    }
+
     public static ResponseSpecification requestReturnsNotFound(
             String expectedStatusText,
             String expectedMessage) {

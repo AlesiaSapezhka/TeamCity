@@ -1,7 +1,5 @@
 package api;
 
-import common.annotations.CreateAndDeleteUser;
-import common.data.BuildInfo;
 import api.generators.BuildCommands;
 import api.generators.CommandLineCommand;
 import api.models.build.BuildResponse;
@@ -11,8 +9,10 @@ import api.models.build_type.CreateBuildTypeRequest;
 import api.models.comparison.ModelAssertions;
 import api.steps.BuildSteps;
 import common.ProjectContext;
-import common.annotations.EnableAgent;
 import common.annotations.CreateAndDeleteProject;
+import common.annotations.CreateAndDeleteUser;
+import common.annotations.EnableAgent;
+import common.data.BuildInfo;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.ResourceAccessMode;
 import org.junit.jupiter.api.parallel.ResourceLock;
@@ -27,24 +27,21 @@ public class HappyPathTest extends BaseTest {
             mode = ResourceAccessMode.READ
     )
     void userCanCreateBuildWithValidData(ProjectContext project) {
-        // Create Build
         CreateBuildTypeRequest buildRequest = BuildSteps.buildValid(project.projectId());
 
         BuildTypeResponse buildResponse =
-                BuildSteps.createBuild(buildRequest);
+                BuildSteps.createBuild(buildRequest, project.user());
 
         ModelAssertions.assertThatModels(buildRequest, buildResponse).match();
         softly.assertThat(buildResponse.getId()).isNotBlank();
 
         String buildTypeId = buildResponse.getId();
 
-        // Create Build step
         CommandLineCommand command = BuildCommands.randomCommandLineCommand();
-
         CreateBuildStepRequest buildStepRequest = BuildSteps.commandLine(command);
-        BuildSteps.addBuildStep(buildTypeId, buildStepRequest);
+        BuildSteps.addBuildStep(buildTypeId, buildStepRequest, project.user());
 
-        BuildTypeResponse build = BuildSteps.getBuild(buildResponse.getId());
+        BuildTypeResponse build = BuildSteps.getBuild(buildResponse.getId(), project.user());
         BuildSteps.assertBuildStep(
                 build,
                 buildTypeId,
@@ -53,9 +50,8 @@ public class HappyPathTest extends BaseTest {
                 buildStepRequest
         );
 
-        // Run Build
-        BuildResponse buildRun = BuildSteps.runBuild(buildTypeId);
-        BuildResponse finishedBuild = BuildSteps.waitForBuild(buildRun.getId());
+        BuildResponse buildRun = BuildSteps.runBuild(buildTypeId, project.user());
+        BuildResponse finishedBuild = BuildSteps.waitForBuild(buildRun.getId(), project.user());
 
         softly.assertThat(finishedBuild.getState())
                 .isEqualTo(BuildInfo.FINISHED_STATE.getValue());

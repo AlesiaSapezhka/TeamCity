@@ -5,6 +5,7 @@ import api.requesters.CrudRequester;
 import api.requesters.interfaces.Endpoints;
 import api.specs.RequestSpecs;
 import api.specs.ResponseSpecs;
+import common.UserContext;
 
 public final class AuthSteps {
     private static final String INVALID_TOKEN =
@@ -34,9 +35,9 @@ public final class AuthSteps {
         perProjectPermissionsEnabled = true;
     }
 
-    public static void authAsUser() {
+    public static void authAsUser(UserContext user) {
         new CrudRequester(
-                RequestSpecs.userSpec(),
+                RequestSpecs.userSpec(user),
                 Endpoints.PROJECTS,
                 ResponseSpecs.requestReturnsOK()
         ).get();
