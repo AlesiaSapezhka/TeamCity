@@ -17,6 +17,12 @@ build/reports/tests
 allure-results/
 allure-report/
 
+### Swagger coverage / dashboard site ###
+swagger-coverage-*.zip
+.swagger-coverage-commandline/
+swagger-coverage-report.html
+site/
+
 ### Eclipse ###
 .apt_generated
 .classpath
