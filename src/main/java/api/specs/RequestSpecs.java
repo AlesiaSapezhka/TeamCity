@@ -2,6 +2,8 @@ package api.specs;
 
 import api.configs.Config;
 import api.configs.SuperUserTokenResolver;
+import com.github.viclovsky.swagger.coverage.FileSystemOutputWriter;
+import com.github.viclovsky.swagger.coverage.SwaggerCoverageRestAssured;
 import common.UserContext;
 import io.qameta.allure.restassured.AllureRestAssured;
 import io.restassured.builder.RequestSpecBuilder;
@@ -11,8 +13,11 @@ import io.restassured.http.ContentType;
 import io.restassured.specification.RequestSpecification;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.List;
+
+import static com.github.viclovsky.swagger.coverage.SwaggerCoverageConstants.OUTPUT_DIRECTORY;
 
 public final class RequestSpecs {
 
@@ -35,9 +40,12 @@ public final class RequestSpecs {
                 .addFilters(List.of(
                         new RequestLoggingFilter(),
                         new ResponseLoggingFilter(),
+                        new SwaggerCoverageRestAssured(
+                                new FileSystemOutputWriter(Paths.get("target/" + OUTPUT_DIRECTORY))
+                        ),
                         new AllureRestAssured()
                 ))
-                .setBaseUri(baseUrl + restPath);
+                .setBaseUri(baseUrl);
     }
 
     private static String restBasePath() {

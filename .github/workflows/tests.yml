@@ -80,9 +80,9 @@ jobs:
           BROWSERVERSION: '128.0'
         run: mvn -B --no-transfer-progress test -Dgroups=precondition -DexcludedGroups=
 
-      # Precondition Allure files must not mix into the suite report.
-      - name: Clear precondition Allure results
-        run: rm -rf target/allure-results
+      # Precondition Allure / swagger files must not mix into suite reports.
+      - name: Clear precondition Allure and Swagger coverage results
+        run: rm -rf target/allure-results target/swagger-coverage-output
 
       - name: Wait for TeamCity ready
         run: |
@@ -155,6 +155,15 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Upload Swagger coverage output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swagger-coverage-${{ matrix.name }}
+          path: target/swagger-coverage-output
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Container logs on failure
         if: failure()
         run: |
@@ -167,10 +176,10 @@ jobs:
         run: docker compose -f "$COMPOSE_FILE" down -v --remove-orphans
 
   # ---------------------------------------------------------------------------
-  # 2) Merge suite results → Allure report → GitHub Pages
+  # 2) Dashboard + Allure + Swagger coverage → GitHub Pages
   # ---------------------------------------------------------------------------
   allure-report:
-    name: Generate and Publish Allure Report
+    name: Generate and Publish Reports
     runs-on: ubuntu-latest
     needs: test
     if: always()
@@ -180,7 +189,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
+      # Full history needed for "new tests last 7/30 days" on the dashboard
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # --- Collect artifacts -------------------------------------------------
       - name: Download suite Allure results
@@ -190,7 +202,15 @@ jobs:
           path: allure-input
           merge-multiple: false
 
-      - name: Download previous report history
+      - name: Download Swagger coverage outputs
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: swagger-coverage-*
+          path: swagger-input
+          merge-multiple: false
+
+      - name: Download previous published site
         uses: dawidd6/action-download-artifact@v6
         continue-on-error: true
         with:
@@ -203,8 +223,8 @@ jobs:
           search_artifacts: true
           if_no_artifact_found: warn
 
-      # --- Layout results for generate --------------------------------------
-      - name: Assemble results and history
+      # --- Allure ------------------------------------------------------------
+      - name: Assemble Allure results and history
         run: |
           set -euo pipefail
           mkdir -p allure-results
@@ -238,33 +258,147 @@ jobs:
           }
           EOF
 
-          if [ -d previous-allure-report/history ]; then
+          # Support both old layout (history/) and new site layout (allure/history/)
+          if [ -d previous-allure-report/allure/history ]; then
+            cp -r previous-allure-report/allure/history allure-results/_meta/history
+          elif [ -d previous-allure-report/history ]; then
             cp -r previous-allure-report/history allure-results/_meta/history
           fi
 
-      # --- Generate ----------------------------------------------------------
       - name: Install Allure CLI
         run: npm install -g allure-commandline@2.32.0
 
       - name: Generate Allure report
         run: |
           mapfile -t RESULT_DIRS < <(find allure-results -mindepth 1 -maxdepth 1 -type d | sort)
-          allure generate "${RESULT_DIRS[@]}" --clean -o allure-report
+          allure generate "${RESULT_DIRS[@]}" --clean -o allure-report-raw
+
+      # --- Swagger coverage (Nbank-style) ------------------------------------
+      - name: Install Swagger coverage CLI
+        if: always()
+        run: |
+          set -euo pipefail
+          SWAGGER_COVERAGE_VERSION=1.5.0
+          ZIP=swagger-coverage-${SWAGGER_COVERAGE_VERSION}.zip
+          wget -q -O "$ZIP" \
+            "https://github.com/viclovsky/swagger-coverage/releases/download/${SWAGGER_COVERAGE_VERSION}/${ZIP}"
+          rm -rf .swagger-coverage-commandline
+          mkdir -p .swagger-coverage-commandline
+          unzip -o "$ZIP" -d .swagger-coverage-commandline
+          BIN=$(find .swagger-coverage-commandline -type f -name swagger-coverage-commandline | head -1)
+          if [ -z "$BIN" ]; then
+            echo "swagger-coverage-commandline binary not found after unzip"
+            exit 1
+          fi
+          chmod +x "$BIN"
+          ln -sf "$(pwd)/$BIN" .swagger-coverage-commandline/swagger-coverage-commandline
+
+      - name: Generate Swagger coverage report
+        if: always()
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p swagger-coverage-merged
+          if [ -d swagger-input ]; then
+            find swagger-input -type f -print0 | while IFS= read -r -d '' f; do
+              base=$(basename "$f")
+              # Avoid collisions across matrix suites
+              parent=$(basename "$(dirname "$f")")
+              cp "$f" "swagger-coverage-merged/${parent}-${base}"
+            done
+          fi
+
+          if [ -z "$(ls -A swagger-coverage-merged 2>/dev/null || true)" ]; then
+            echo "No swagger-coverage output from tests; skipping report"
+            exit 0
+          fi
+
+          BIN=.swagger-coverage-commandline/swagger-coverage-commandline
+          "$BIN" -s Swagger.txt -i swagger-coverage-merged
+          ls -la swagger-coverage-report.html || ls -la *.html || true
+
+      # --- Site: dashboard + allure + swagger --------------------------------
+      - name: Build GitHub Pages site
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -rf site
+          mkdir -p site/allure site/swagger-coverage site/data
+
+          if [ -d allure-report-raw ]; then
+            cp -a allure-report-raw/. site/allure/
+          fi
+
+          if [ -f swagger-coverage-report.html ]; then
+            cp swagger-coverage-report.html site/swagger-coverage/index.html
+            cp swagger-coverage-report.html site/swagger-coverage/swagger-coverage-report.html
+            shopt -s nullglob
+            for f in swagger-coverage-report*; do
+              cp -a "$f" site/swagger-coverage/ || true
+            done
+            if [ -d swagger-coverage-results ]; then
+              cp -a swagger-coverage-results/. site/swagger-coverage/ || true
+            fi
+          else
+            printf '%s\n' \
+              '<!DOCTYPE html><html><body>' \
+              '<h1>Swagger coverage</h1>' \
+              '<p>No coverage data for this run.</p>' \
+              '<p><a href="../">Back to dashboard</a></p>' \
+              '</body></html>' \
+              > site/swagger-coverage/index.html
+          fi
+
+          HISTORY_IN=""
+          if [ -f previous-allure-report/data/metrics-history.json ]; then
+            HISTORY_IN=previous-allure-report/data/metrics-history.json
+          fi
+
+          python3 scripts/generate-dashboard.py \
+            --results-dir allure-results \
+            --site-dir site \
+            --template scripts/dashboard/template.html \
+            --repo-root . \
+            --swagger-report swagger-coverage-report.html \
+            ${HISTORY_IN:+--history-in "$HISTORY_IN"} \
+            --run-number "${{ github.run_number }}" \
+            --run-id "${{ github.run_id }}" \
+            --branch "${{ github.ref_name }}" \
+            --commit "${{ github.sha }}" \
+            --build-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
       # --- Publish -----------------------------------------------------------
-      - name: Upload Allure report artifact
+      - name: Upload site artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: allure-report
-          path: allure-report
+          path: site
           retention-days: 30
 
       - uses: actions/configure-pages@v5
+        if: always()
 
       - uses: actions/upload-pages-artifact@v4
+        if: always()
         with:
-          path: allure-report
+          path: site
 
       - name: Deploy to GitHub Pages
         id: deployment
+        if: always()
         uses: actions/deploy-pages@v4
+
+      - name: Write report links to job summary
+        if: always()
+        run: |
+          PAGE_URL="${{ steps.deployment.outputs.page_url }}"
+          if [ -z "$PAGE_URL" ]; then
+            PAGE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          fi
+          {
+            echo "### Automation reports"
+            echo "- [Dashboard](${PAGE_URL})"
+            echo "- [Allure Report](${PAGE_URL}allure/)"
+            echo "- [Swagger API Coverage](${PAGE_URL}swagger-coverage/)"
+          } >> "$GITHUB_STEP_SUMMARY"
