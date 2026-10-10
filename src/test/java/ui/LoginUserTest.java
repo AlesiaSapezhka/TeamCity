@@ -25,4 +25,14 @@ class LoginUserTest extends BaseUiTest {
                 .login(user.username(), user.password().toLowerCase())
                 .checkErrorMessage();
     }
+
+    @Test
+    @CreateAndDeleteUser
+    void userShouldLoginViaUiValidData(UserContext user) {
+        new LoginPage()
+                .open()
+                .login(user.username(), user.password())
+                .goToMainPage()
+                .welcomeMessageShouldBeVisible();
+    }
 }
