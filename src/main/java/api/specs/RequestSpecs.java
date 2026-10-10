@@ -45,7 +45,7 @@ public final class RequestSpecs {
                         ),
                         new AllureRestAssured()
                 ))
-                .setBaseUri(baseUrl + restPath);
+                .setBaseUri(baseUrl);
     }
 
     private static String restBasePath() {

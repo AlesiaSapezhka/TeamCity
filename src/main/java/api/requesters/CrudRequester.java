@@ -1,5 +1,6 @@
 package api.requesters;
 
+import api.configs.Config;
 import api.models.BaseModel;
 import api.requesters.interfaces.CrudEndpointInterface;
 import api.requesters.interfaces.Endpoints;
@@ -14,6 +15,7 @@ import java.util.Map;
 import static io.restassured.RestAssured.given;
 
 public class CrudRequester extends HttpRequest implements CrudEndpointInterface {
+    private static final String API_VERSION = Config.getProperty("apiVersion");
 
     public CrudRequester(
             RequestSpecification requestSpecification,
@@ -40,7 +42,7 @@ public class CrudRequester extends HttpRequest implements CrudEndpointInterface 
                 request.body(model);
             }
             return request
-                    .post(endpoints.getUrl())
+                    .post(API_VERSION + endpoints.getUrl())
                     .then()
                     .spec(responseSpecification);
         });
@@ -58,7 +60,7 @@ public class CrudRequester extends HttpRequest implements CrudEndpointInterface 
                         .spec(requestSpecification)
                         .pathParams(pathParams)
                         .when()
-                        .get(endpoints.getUrl())
+                        .get(API_VERSION + endpoints.getUrl())
                         .then()
                         .spec(responseSpecification));
     }
@@ -79,7 +81,7 @@ public class CrudRequester extends HttpRequest implements CrudEndpointInterface 
             }
             return request
                     .when()
-                    .put(endpoints.getUrl())
+                    .put(API_VERSION + endpoints.getUrl())
                     .then()
                     .spec(responseSpecification);
         });
@@ -96,7 +98,7 @@ public class CrudRequester extends HttpRequest implements CrudEndpointInterface 
                 .spec(requestSpecification)
                 .pathParams(pathParams)
                 .when()
-                .delete(endpoints.getUrl())
+                .delete(API_VERSION + endpoints.getUrl())
                 .then()
                 .spec(responseSpecification));
     }
