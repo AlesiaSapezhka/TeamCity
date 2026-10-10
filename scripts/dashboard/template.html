@@ -53,11 +53,19 @@
       margin: 0 auto;
       padding: 0 2rem 3rem;
     }
+    h2.section {
+      margin: 1.75rem 0 0.75rem;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
     .cards {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 1rem;
-      margin: 1.5rem 0;
+      margin: 0.5rem 0 0;
     }
     .card {
       background: var(--panel);
@@ -75,7 +83,7 @@
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
       gap: 1rem;
-      margin-top: 1rem;
+      margin-top: 1.5rem;
     }
     .chart-panel {
       background: var(--panel);
@@ -110,10 +118,18 @@
     </div>
   </header>
   <main>
-    <section class="cards" id="cards"></section>
+    <h2 class="section">Last run</h2>
+    <section class="cards" id="cardsRun"></section>
+
+    <h2 class="section">Duration</h2>
+    <section class="cards" id="cardsDuration"></section>
+
+    <h2 class="section">Automation size</h2>
+    <section class="cards" id="cardsSize"></section>
+
     <section class="charts">
       <div class="chart-panel">
-        <h2>Automation growth (unique tests in git)</h2>
+        <h2>Automation growth (tests in git)</h2>
         <canvas id="growthChart"></canvas>
       </div>
       <div class="chart-panel">
@@ -133,10 +149,35 @@
       return "bad";
     }
 
+    function formatDuration(sec) {
+      if (sec == null || Number.isNaN(sec)) return "—";
+      if (sec < 60) return `${sec.toFixed(1)}s`;
+      const m = Math.floor(sec / 60);
+      const s = Math.round(sec % 60);
+      return `${m}m ${s}s`;
+    }
+
     function card(label, value, hint, cls) {
       return `<article class="card"><div class="label">${label}</div>`
         + `<div class="value ${cls || ""}">${value}</div>`
         + `<div class="hint">${hint || ""}</div></article>`;
+    }
+
+    function niceScale(values, padRatio = 0.35) {
+      const nums = values.filter(v => typeof v === "number" && !Number.isNaN(v));
+      if (!nums.length) return { min: 0, max: 10 };
+      let min = Math.min(...nums);
+      let max = Math.max(...nums);
+      if (min === max) {
+        const pad = Math.max(2, Math.abs(min) * padRatio || 2);
+        return { min: Math.max(0, min - pad), max: max + pad };
+      }
+      const span = max - min;
+      const pad = Math.max(span * padRatio, 1);
+      return {
+        min: Math.max(0, Math.floor(min - pad)),
+        max: Math.ceil(max + pad),
+      };
     }
 
     const m = METRICS;
@@ -152,17 +193,32 @@
 
     const passRate = exec.pass_rate != null ? `${exec.pass_rate.toFixed(1)}%` : "—";
     const swaggerPct = swagger.coverage_percent != null ? `${swagger.coverage_percent.toFixed(1)}%` : "—";
+    const new7 = git.new_tests_7d ?? 0;
+    const new30 = git.new_tests_30d ?? 0;
 
-    document.getElementById("cards").innerHTML = [
+    document.getElementById("cardsRun").innerHTML = [
       card("Pass rate", passRate, "Last completed run", pctClass(exec.pass_rate)),
       card("Executions", exec.total ?? "—", `${exec.passed ?? 0} passed · ${exec.failed ?? 0} failed · ${exec.broken ?? 0} broken · ${exec.skipped ?? 0} skipped`),
-      card("Unique tests", exec.unique_scenarios ?? "—", "Deduped scenarios (not browser matrix)"),
-      card("Tests in git", git.total_tests ?? "—", `+${git.new_tests_7d ?? 0} / 7d · +${git.new_tests_30d ?? 0} / 30d`),
-      card("Avg duration", exec.avg_duration_sec != null ? `${exec.avg_duration_sec.toFixed(1)}s` : "—", "Per execution"),
-      card("API coverage", swaggerPct, `${swagger.covered_operations ?? 0} / ${swagger.all_operations ?? 0} operations`, pctClass(swagger.coverage_percent)),
+      card("Unique scenarios", exec.unique_scenarios ?? "—", "Deduped across browser matrix"),
       card("API suite", suites.api?.total ?? "—", `${suites.api?.passed ?? 0} passed`),
       card("UI Chrome", suites["ui-chrome"]?.total ?? "—", `${suites["ui-chrome"]?.passed ?? 0} passed`),
       card("UI Firefox", suites["ui-firefox"]?.total ?? "—", `${suites["ui-firefox"]?.passed ?? 0} passed`),
+      card("API coverage", swaggerPct, `${swagger.covered_operations ?? 0} / ${swagger.all_operations ?? 0} operations`, pctClass(swagger.coverage_percent)),
+    ].join("");
+
+    document.getElementById("cardsDuration").innerHTML = [
+      card("API duration", formatDuration(exec.api_duration_sec), "Sum of API test times"),
+      card("UI duration", formatDuration(exec.ui_duration_sec), "Wall time ≈ slower of Chrome/Firefox (parallel)"),
+      card("UI Chrome", formatDuration(exec.ui_chrome_duration_sec), "Sum of Chrome UI tests"),
+      card("UI Firefox", formatDuration(exec.ui_firefox_duration_sec), "Sum of Firefox UI tests"),
+      card("Avg per test", formatDuration(exec.avg_duration_sec), "Mean execution duration"),
+      card("Est. full run", formatDuration(exec.total_duration_sec), "API + UI wall (matrix parallel)"),
+    ].join("");
+
+    document.getElementById("cardsSize").innerHTML = [
+      card("Tests in git", git.total_tests ?? "—", `API ${git.api_tests ?? 0} · UI ${git.ui_tests ?? 0}`),
+      card("New (7 days)", new7 > 0 ? `+${new7}` : "0", "Net @Test added in git diffs"),
+      card("New (30 days)", new30 > 0 ? `+${new30}` : "0", "Net @Test added in git diffs"),
     ].join("");
 
     document.getElementById("footer").textContent =
@@ -171,6 +227,7 @@
     const histLabels = history.map(h => `#${h.run_number}`);
     const histTests = history.map(h => h.git_total_tests);
     const histPass = history.map(h => h.pass_rate);
+    const testsScale = niceScale(histTests);
 
     new Chart(document.getElementById("growthChart"), {
       type: "line",
@@ -198,8 +255,21 @@
       options: {
         responsive: true,
         scales: {
-          y: { beginAtZero: true, ticks: { color: "#9aa8bc" }, grid: { color: "#2a3648" } },
-          y1: { position: "right", min: 0, max: 100, ticks: { color: "#9aa8bc" }, grid: { drawOnChartArea: false } },
+          y: {
+            min: testsScale.min,
+            max: testsScale.max,
+            ticks: { color: "#9aa8bc", precision: 0 },
+            grid: { color: "#2a3648" },
+            title: { display: true, text: "Tests in git", color: "#9aa8bc" },
+          },
+          y1: {
+            position: "right",
+            min: 70,
+            max: 100,
+            ticks: { color: "#9aa8bc" },
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: "Pass rate %", color: "#9aa8bc" },
+          },
           x: { ticks: { color: "#9aa8bc" }, grid: { color: "#2a3648" } },
         },
         plugins: { legend: { labels: { color: "#e7ecf3" } } },
