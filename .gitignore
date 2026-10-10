@@ -25,3 +25,9 @@ allure-report/
 .settings
 .springBeans
 .sts4-cache
+
+### Swagger coverage / dashboard site ###
+swagger-coverage-*.zip
+.swagger-coverage-commandline/
+swagger-coverage-report.html
+site/
