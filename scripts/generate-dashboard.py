@@ -16,6 +16,14 @@ TEST_ANNOTATION = re.compile(
     r"^\s*@(?:Test|ParameterizedTest|RepeatedTest|TestFactory)\b",
     re.MULTILINE,
 )
+ADDED_TEST_ANNOTATION = re.compile(
+    r"^\+\s*@(?:Test|ParameterizedTest|RepeatedTest|TestFactory)\b",
+    re.MULTILINE,
+)
+REMOVED_TEST_ANNOTATION = re.compile(
+    r"^\-\s*@(?:Test|ParameterizedTest|RepeatedTest|TestFactory)\b",
+    re.MULTILINE,
+)
 SWAGGER_ALL = re.compile(r"All operations:\s*(\d+)", re.IGNORECASE)
 SWAGGER_WITHOUT = re.compile(r"Operations without calls:\s*(\d+)", re.IGNORECASE)
 
@@ -30,18 +38,6 @@ def write_json(path: Path, data) -> None:
     with path.open("w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
         f.write("\n")
-
-
-def collect_allure_results(results_root: Path) -> list[dict]:
-    results = []
-    if not results_root.is_dir():
-        return results
-    for path in results_root.rglob("*-result.json"):
-        try:
-            results.append(read_json(path))
-        except (OSError, json.JSONDecodeError):
-            continue
-    return results
 
 
 def suite_of(result: dict, fallback_dir: str | None = None) -> str:
@@ -62,34 +58,49 @@ def unique_key(result: dict) -> str:
     return history_id or full_name
 
 
-def summarize_executions(results: list[dict], results_root: Path) -> tuple[dict, dict]:
+def result_duration_ms(result: dict) -> float | None:
+    start = result.get("start")
+    stop = result.get("stop")
+    if isinstance(start, (int, float)) and isinstance(stop, (int, float)) and stop >= start:
+        return float(stop - start)
+    return None
+
+
+def summarize_executions(results: list[dict]) -> tuple[dict, dict]:
     statuses = defaultdict(int)
     suites: dict[str, dict] = defaultdict(
-        lambda: {"passed": 0, "failed": 0, "broken": 0, "skipped": 0, "total": 0}
+        lambda: {
+            "passed": 0,
+            "failed": 0,
+            "broken": 0,
+            "skipped": 0,
+            "total": 0,
+            "duration_sec": 0.0,
+        }
     )
-    durations_ms = []
+    durations_ms: list[float] = []
     unique = set()
 
     for result in results:
         status = (result.get("status") or "unknown").lower()
         if status not in ("passed", "failed", "broken", "skipped"):
-            status = "failed" if status in ("unknown",) else status
+            status = "failed"
         statuses[status] += 1
 
-        # Infer suite from parent path when labels missing
-        fallback = None
-        # not available here without path; suite_of uses labels
-        suite = suite_of(result, fallback)
+        suite = suite_of(result)
         suites[suite]["total"] += 1
         if status in suites[suite]:
             suites[suite][status] += 1
 
         unique.add(unique_key(result))
 
-        start = result.get("start")
-        stop = result.get("stop")
-        if isinstance(start, (int, float)) and isinstance(stop, (int, float)) and stop >= start:
-            durations_ms.append(stop - start)
+        duration = result_duration_ms(result)
+        if duration is not None:
+            durations_ms.append(duration)
+            suites[suite]["duration_sec"] += duration / 1000.0
+
+    for suite_data in suites.values():
+        suite_data["duration_sec"] = round(suite_data["duration_sec"], 1)
 
     passed = statuses.get("passed", 0)
     failed = statuses.get("failed", 0)
@@ -100,6 +111,12 @@ def summarize_executions(results: list[dict], results_root: Path) -> tuple[dict,
     pass_rate = (passed / completed * 100.0) if completed else 0.0
     avg_sec = (sum(durations_ms) / len(durations_ms) / 1000.0) if durations_ms else None
 
+    api_sec = suites.get("api", {}).get("duration_sec") or 0.0
+    ui_chrome_sec = suites.get("ui-chrome", {}).get("duration_sec") or 0.0
+    ui_firefox_sec = suites.get("ui-firefox", {}).get("duration_sec") or 0.0
+    # Matrix jobs run in parallel — wall time for UI ≈ slower browser suite
+    ui_wall_sec = max(ui_chrome_sec, ui_firefox_sec) if (ui_chrome_sec or ui_firefox_sec) else 0.0
+
     executions = {
         "total": total,
         "passed": passed,
@@ -109,6 +126,11 @@ def summarize_executions(results: list[dict], results_root: Path) -> tuple[dict,
         "pass_rate": round(pass_rate, 2),
         "unique_scenarios": len(unique),
         "avg_duration_sec": round(avg_sec, 2) if avg_sec is not None else None,
+        "api_duration_sec": round(api_sec, 1) if api_sec else None,
+        "ui_chrome_duration_sec": round(ui_chrome_sec, 1) if ui_chrome_sec else None,
+        "ui_firefox_duration_sec": round(ui_firefox_sec, 1) if ui_firefox_sec else None,
+        "ui_duration_sec": round(ui_wall_sec, 1) if ui_wall_sec else None,
+        "total_duration_sec": round(api_sec + ui_wall_sec, 1) if (api_sec or ui_wall_sec) else None,
     }
     return executions, dict(suites)
 
@@ -121,45 +143,52 @@ def count_tests_in_file(path: Path) -> int:
     return len(TEST_ANNOTATION.findall(text))
 
 
+def net_new_tests_since(repo_root: Path, days: int) -> int:
+    """Count net @Test additions in diffs (works for new methods in existing files)."""
+    try:
+        out_bytes = subprocess.check_output(
+            [
+                "git",
+                "-C",
+                str(repo_root),
+                "log",
+                f"--since={days}.days.ago",
+                "-p",
+                "--unified=0",
+                "--",
+                "src/test/java",
+            ],
+            stderr=subprocess.DEVNULL,
+        )
+        out = out_bytes.decode("utf-8", errors="replace")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return 0
+    added = len(ADDED_TEST_ANNOTATION.findall(out))
+    removed = len(REMOVED_TEST_ANNOTATION.findall(out))
+    return max(added - removed, 0)
+
+
 def git_test_metrics(repo_root: Path) -> dict:
     test_root = repo_root / "src" / "test" / "java"
     total = 0
+    api_tests = 0
+    ui_tests = 0
     if test_root.is_dir():
         for path in test_root.rglob("*Test.java"):
-            total += count_tests_in_file(path)
-
-    def added_since(days: int) -> int:
-        try:
-            out = subprocess.check_output(
-                [
-                    "git",
-                    "-C",
-                    str(repo_root),
-                    "log",
-                    f"--since={days}.days.ago",
-                    "--pretty=format:",
-                    "--diff-filter=A",
-                    "--name-only",
-                    "--",
-                    "src/test/java",
-                ],
-                text=True,
-                stderr=subprocess.DEVNULL,
-            )
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            return 0
-        files = {line.strip() for line in out.splitlines() if line.strip().endswith("Test.java")}
-        added = 0
-        for rel in files:
-            path = repo_root / rel
-            if path.is_file():
-                added += count_tests_in_file(path)
-        return added
+            count = count_tests_in_file(path)
+            total += count
+            rel = path.relative_to(test_root).as_posix()
+            if rel.startswith("api/"):
+                api_tests += count
+            elif rel.startswith("ui/"):
+                ui_tests += count
 
     return {
         "total_tests": total,
-        "new_tests_7d": added_since(7),
-        "new_tests_30d": added_since(30),
+        "api_tests": api_tests,
+        "ui_tests": ui_tests,
+        "new_tests_7d": net_new_tests_since(repo_root, 7),
+        "new_tests_30d": net_new_tests_since(repo_root, 30),
     }
 
 
@@ -204,7 +233,6 @@ def load_history(path: Path) -> list[dict]:
 
 
 def append_history(history: list[dict], point: dict, limit: int = 40) -> list[dict]:
-    # Replace same run_number if re-run
     history = [h for h in history if h.get("run_number") != point.get("run_number")]
     history.append(point)
     history.sort(key=lambda h: h.get("run_number") or 0)
@@ -215,6 +243,26 @@ def render_html(template_path: Path, metrics: dict) -> str:
     template = template_path.read_text(encoding="utf-8")
     payload = json.dumps(metrics, ensure_ascii=False)
     return template.replace("__METRICS_JSON__", payload)
+
+
+def load_results(results_dir: Path) -> list[dict]:
+    by_dir: list[dict] = []
+    if not results_dir.is_dir():
+        return by_dir
+    for suite_dir in sorted(p for p in results_dir.iterdir() if p.is_dir()):
+        if suite_dir.name in ("_meta", "history"):
+            continue
+        for path in suite_dir.glob("*-result.json"):
+            try:
+                item = read_json(path)
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not any(l.get("name") == "parentSuite" for l in (item.get("labels") or [])):
+                item.setdefault("labels", []).append(
+                    {"name": "parentSuite", "value": suite_dir.name}
+                )
+            by_dir.append(item)
+    return by_dir
 
 
 def main() -> int:
@@ -232,37 +280,15 @@ def main() -> int:
     parser.add_argument("--build-url", default="")
     args = parser.parse_args()
 
-    results = collect_allure_results(args.results_dir)
-    # Attach suite from directory when walking
-    by_dir: list[dict] = []
-    if args.results_dir.is_dir():
-        for suite_dir in sorted(p for p in args.results_dir.iterdir() if p.is_dir()):
-            if suite_dir.name in ("_meta", "history"):
-                continue
-            for path in suite_dir.glob("*-result.json"):
-                try:
-                    item = read_json(path)
-                except (OSError, json.JSONDecodeError):
-                    continue
-                if not any(
-                    l.get("name") == "parentSuite" for l in (item.get("labels") or [])
-                ):
-                    item.setdefault("labels", []).append(
-                        {"name": "parentSuite", "value": suite_dir.name}
-                    )
-                by_dir.append(item)
-    if by_dir:
-        results = by_dir
-
-    executions, suites = summarize_executions(results, args.results_dir)
+    results = load_results(args.results_dir)
+    executions, suites = summarize_executions(results)
     git = git_test_metrics(args.repo_root)
     swagger = parse_swagger_html(args.swagger_report)
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     date_only = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    history_path = args.history_in
-    history = load_history(history_path) if history_path else []
+    history = load_history(args.history_in) if args.history_in else []
 
     try:
         run_number_int = int(args.run_number) if args.run_number else None
@@ -277,6 +303,8 @@ def main() -> int:
         "unique_scenarios": executions["unique_scenarios"],
         "git_total_tests": git["total_tests"],
         "swagger_coverage_percent": swagger["coverage_percent"],
+        "api_duration_sec": executions.get("api_duration_sec"),
+        "ui_duration_sec": executions.get("ui_duration_sec"),
     }
     history = append_history(history, point)
 
@@ -310,7 +338,8 @@ def main() -> int:
     print(
         f"Dashboard written to {site / 'index.html'} "
         f"(executions={executions['total']}, pass_rate={executions['pass_rate']}%, "
-        f"swagger={swagger['coverage_percent']}%)"
+        f"git_tests={git['total_tests']}, new_7d={git['new_tests_7d']}, "
+        f"api={executions.get('api_duration_sec')}s, ui={executions.get('ui_duration_sec')}s)"
     )
     return 0
 

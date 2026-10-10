@@ -402,3 +402,40 @@ jobs:
             echo "- [Allure Report](${PAGE_URL}allure/)"
             echo "- [Swagger API Coverage](${PAGE_URL}swagger-coverage/)"
           } >> "$GITHUB_STEP_SUMMARY"
+          echo "PAGE_URL=$PAGE_URL" >> "$GITHUB_ENV"
+
+      # Email managers only for main-branch runs (avoids noise from feature/CI branches).
+      # Required secrets: SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, MAIL_FROM, MAIL_TO
+      - name: Email dashboard link (main only)
+        if: always() && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          secure: true
+          from: ${{ secrets.MAIL_FROM }}
+          to: ${{ secrets.MAIL_TO }}
+          subject: "TeamCity Automation Report #${{ github.run_number }} (${{ job.status }})"
+          body: |
+            Automation pipeline finished on main.
+
+            Status: ${{ job.status }}
+            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Dashboard: ${{ env.PAGE_URL }}
+            Allure: ${{ env.PAGE_URL }}allure/
+            Swagger coverage: ${{ env.PAGE_URL }}swagger-coverage/
+
+            Commit: ${{ github.sha }}
+          html_body: |
+            <p>Automation pipeline finished on <b>main</b>.</p>
+            <ul>
+              <li><b>Status:</b> ${{ job.status }}</li>
+              <li><a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">Workflow run #${{ github.run_number }}</a></li>
+              <li><a href="${{ env.PAGE_URL }}">Dashboard</a></li>
+              <li><a href="${{ env.PAGE_URL }}allure/">Allure Report</a></li>
+              <li><a href="${{ env.PAGE_URL }}swagger-coverage/">Swagger API Coverage</a></li>
+            </ul>
+            <p>Commit: <code>${{ github.sha }}</code></p>
