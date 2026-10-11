@@ -1,3 +1,4 @@
+### Build / Maven ###
 target/
 test-output/
 ${project.build.directory}/
@@ -9,19 +10,10 @@ build/reports/tests
 
 ### IntelliJ IDEA ###
 .idea
+*.iml
 
 ### VS Code ###
 .vscode/
-
-### Allure ###
-allure-results/
-allure-report/
-
-### Swagger coverage / dashboard site ###
-swagger-coverage-*.zip
-.swagger-coverage-commandline/
-swagger-coverage-report.html
-site/
 
 ### Eclipse ###
 .apt_generated
@@ -31,3 +23,28 @@ site/
 .settings
 .springBeans
 .sts4-cache
+
+### Allure (local / CI workspace leftovers) ###
+allure-results/
+allure-report/
+allure-report-raw/
+allure-input/
+previous-allure-report/
+
+### Swagger coverage CLI & local reports ###
+.swagger-coverage/
+.swagger-coverage-commandline/
+swagger-coverage-*.zip
+swagger-coverage-report.html
+swagger-coverage-report/
+swagger-coverage-results/
+swagger-coverage-merged/
+swagger-input/
+
+### Dashboard site (generated, published from CI artifact) ###
+site/
+site-test/
+
+### OS ###
+.DS_Store
+Thumbs.db
