@@ -199,7 +199,7 @@
     document.getElementById("cardsRun").innerHTML = [
       card("Pass rate", passRate, "Last completed run", pctClass(exec.pass_rate)),
       card("Executions", exec.total ?? "—", `${exec.passed ?? 0} passed · ${exec.failed ?? 0} failed · ${exec.broken ?? 0} broken · ${exec.skipped ?? 0} skipped`),
-      card("Unique scenarios", exec.unique_scenarios ?? "—", "Deduped across browser matrix"),
+      card("Unique scenarios", exec.unique_scenarios),
       card("API suite", suites.api?.total ?? "—", `${suites.api?.passed ?? 0} passed`),
       card("UI Chrome", suites["ui-chrome"]?.total ?? "—", `${suites["ui-chrome"]?.passed ?? 0} passed`),
       card("UI Firefox", suites["ui-firefox"]?.total ?? "—", `${suites["ui-firefox"]?.passed ?? 0} passed`),

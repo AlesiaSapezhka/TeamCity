@@ -273,7 +273,7 @@ jobs:
           mapfile -t RESULT_DIRS < <(find allure-results -mindepth 1 -maxdepth 1 -type d | sort)
           allure generate "${RESULT_DIRS[@]}" --clean -o allure-report-raw
 
-      # --- Swagger coverage (Nbank-style) ------------------------------------
+      # --- Swagger coverage ------------------------------------
       - name: Install Swagger coverage CLI
         if: always()
         run: |
