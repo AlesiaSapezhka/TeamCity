@@ -127,6 +127,9 @@
     <h2 class="section">Automation size</h2>
     <section class="cards" id="cardsSize"></section>
 
+    <h2 class="section">Production defects reproduced in autotests</h2>
+    <section class="cards" id="cardsDefects"></section>
+
     <section class="charts">
       <div class="chart-panel">
         <h2>Automation growth (tests in git)</h2>
@@ -135,6 +138,10 @@
       <div class="chart-panel">
         <h2>Last run executions by suite</h2>
         <canvas id="suiteChart"></canvas>
+      </div>
+      <div class="chart-panel">
+        <h2>Defects tracked (@Tag("bug"))</h2>
+        <canvas id="defectsChart"></canvas>
       </div>
     </section>
   </main>
@@ -185,6 +192,7 @@
     const exec = m.executions || {};
     const suites = m.suites || {};
     const git = m.git || {};
+    const defects = m.defects || {};
     const swagger = m.swagger || {};
     const history = m.history || [];
 
@@ -195,11 +203,14 @@
     const swaggerPct = swagger.coverage_percent != null ? `${swagger.coverage_percent.toFixed(1)}%` : "—";
     const new7 = git.new_tests_7d ?? 0;
     const new30 = git.new_tests_30d ?? 0;
+    const newBugs7 = git.new_bug_tests_7d ?? 0;
+    const tracked = defects.tracked_in_git ?? git.bug_tests ?? 0;
+    const stillOpen = defects.still_reproduced ?? 0;
 
     document.getElementById("cardsRun").innerHTML = [
-      card("Pass rate", passRate, "Last completed run", pctClass(exec.pass_rate)),
+      card("Pass rate", passRate, "Excludes @Tag(\"bug\") known defects", pctClass(exec.pass_rate)),
       card("Executions", exec.total ?? "—", `${exec.passed ?? 0} passed · ${exec.failed ?? 0} failed · ${exec.broken ?? 0} broken · ${exec.skipped ?? 0} skipped`),
-      card("Unique scenarios", exec.unique_scenarios),
+      card("Unique scenarios", exec.unique_scenarios ?? "—", "Deduped across browser matrix"),
       card("API suite", suites.api?.total ?? "—", `${suites.api?.passed ?? 0} passed`),
       card("UI Chrome", suites["ui-chrome"]?.total ?? "—", `${suites["ui-chrome"]?.passed ?? 0} passed`),
       card("UI Firefox", suites["ui-firefox"]?.total ?? "—", `${suites["ui-firefox"]?.passed ?? 0} passed`),
@@ -221,13 +232,23 @@
       card("New (30 days)", new30 > 0 ? `+${new30}` : "0", "Net @Test added in git diffs"),
     ].join("");
 
+    document.getElementById("cardsDefects").innerHTML = [
+      card("Defects tracked", tracked, `@Tag("bug") scenarios in git`, tracked > 0 ? "warn" : "ok"),
+      card("Still reproduced", stillOpen, "Bug tests that failed this run", stillOpen > 0 ? "bad" : "ok"),
+      card("No longer failing", defects.no_longer_failing ?? 0, "Bug-tagged tests that passed (maybe fixed)"),
+      card("New defects (7d)", newBugs7 > 0 ? `+${newBugs7}` : "0", "Net @Tag(\"bug\") added in git"),
+    ].join("");
+
     document.getElementById("footer").textContent =
       `Generated ${m.generated_at || ""} · commit ${(run.commit || "").slice(0, 7)}`;
 
     const histLabels = history.map(h => `#${h.run_number}`);
     const histTests = history.map(h => h.git_total_tests);
     const histPass = history.map(h => h.pass_rate);
+    const histDefects = history.map(h => h.defects_tracked ?? 0);
+    const histOpen = history.map(h => h.defects_still_reproduced ?? 0);
     const testsScale = niceScale(histTests);
+    const defectsScale = niceScale([...histDefects, ...histOpen, 0, 1]);
 
     new Chart(document.getElementById("growthChart"), {
       type: "line",
@@ -269,6 +290,42 @@
             ticks: { color: "#9aa8bc" },
             grid: { drawOnChartArea: false },
             title: { display: true, text: "Pass rate %", color: "#9aa8bc" },
+          },
+          x: { ticks: { color: "#9aa8bc" }, grid: { color: "#2a3648" } },
+        },
+        plugins: { legend: { labels: { color: "#e7ecf3" } } },
+      },
+    });
+
+    new Chart(document.getElementById("defectsChart"), {
+      type: "line",
+      data: {
+        labels: histLabels,
+        datasets: [
+          {
+            label: "Tracked (@Tag bug)",
+            data: histDefects,
+            borderColor: "#f0b429",
+            backgroundColor: "rgba(240,180,41,0.12)",
+            tension: 0.25,
+          },
+          {
+            label: "Still reproduced",
+            data: histOpen,
+            borderColor: "#f07178",
+            backgroundColor: "transparent",
+            tension: 0.25,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: {
+            min: defectsScale.min,
+            max: Math.max(defectsScale.max, 1),
+            ticks: { color: "#9aa8bc", precision: 0 },
+            grid: { color: "#2a3648" },
           },
           x: { ticks: { color: "#9aa8bc" }, grid: { color: "#2a3648" } },
         },

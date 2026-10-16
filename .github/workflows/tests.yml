@@ -96,6 +96,7 @@ jobs:
           exit 1
 
       # --- Suite under test --------------------------------------------------
+      # Main suite excludes @Tag("bug") so known product defects do not fail the job.
       - name: Run tests
         env:
           BROWSER: ${{ matrix.browser }}
@@ -103,7 +104,24 @@ jobs:
         run: |
           mvn -B --no-transfer-progress \
             test \
-            -Dtest='${{ matrix.tests }}'
+            -Dtest='${{ matrix.tests }}' \
+            -DexcludedGroups=precondition,bug
+
+      # Known defects (@Tag("bug")): still executed for Allure/Dashboard metrics,
+      # but continue-on-error so a failing reproduction does not fail the pipeline.
+      - name: Run bug reproduction tests
+        if: always()
+        continue-on-error: true
+        env:
+          BROWSER: ${{ matrix.browser }}
+          BROWSERVERSION: ${{ matrix.browserVersion }}
+        run: |
+          mvn -B --no-transfer-progress \
+            test \
+            -Dtest='${{ matrix.tests }}' \
+            -Dgroups=bug \
+            -DexcludedGroups= \
+            -DfailIfNoTests=false
 
       # --- Package Allure results for the report job -------------------------
       - name: Tag Allure results with suite identity

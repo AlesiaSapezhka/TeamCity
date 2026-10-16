@@ -24,6 +24,9 @@ REMOVED_TEST_ANNOTATION = re.compile(
     r"^\-\s*@(?:Test|ParameterizedTest|RepeatedTest|TestFactory)\b",
     re.MULTILINE,
 )
+BUG_TAG = re.compile(r'@Tag\s*\(\s*"bug"\s*\)')
+ADDED_BUG_TAG = re.compile(r'^\+\s*@Tag\s*\(\s*"bug"\s*\)', re.MULTILINE)
+REMOVED_BUG_TAG = re.compile(r'^\-\s*@Tag\s*\(\s*"bug"\s*\)', re.MULTILINE)
 SWAGGER_ALL = re.compile(r"All operations:\s*(\d+)", re.IGNORECASE)
 SWAGGER_WITHOUT = re.compile(r"Operations without calls:\s*(\d+)", re.IGNORECASE)
 
@@ -66,8 +69,47 @@ def result_duration_ms(result: dict) -> float | None:
     return None
 
 
+def is_bug_result(result: dict) -> bool:
+    for label in result.get("labels") or []:
+        name = (label.get("name") or "").lower()
+        value = (label.get("value") or "").lower()
+        if name == "tag" and value == "bug":
+            return True
+    return False
+
+
+def summarize_defects(results: list[dict], git_bug_count: int) -> dict:
+    """Production defects tracked via @Tag(\"bug\")."""
+    bug_results = [r for r in results if is_bug_result(r)]
+    unique_bugs = {unique_key(r) for r in bug_results}
+    still_open = sum(
+        1
+        for r in bug_results
+        if (r.get("status") or "").lower() in ("failed", "broken")
+    )
+    # unique open by scenario (chrome/firefox share key after ::suite strip)
+    open_keys = {
+        unique_key(r)
+        for r in bug_results
+        if (r.get("status") or "").lower() in ("failed", "broken")
+    }
+    fixed_keys = {
+        unique_key(r)
+        for r in bug_results
+        if (r.get("status") or "").lower() == "passed"
+    }
+    return {
+        "tracked_in_git": git_bug_count,
+        "executed": len(unique_bugs) if unique_bugs else len(bug_results),
+        "still_reproduced": len(open_keys),
+        "no_longer_failing": len(fixed_keys - open_keys),
+        "executions_failed": still_open,
+    }
+
+
 def summarize_executions(results: list[dict]) -> tuple[dict, dict]:
     statuses = defaultdict(int)
+    health_statuses = defaultdict(int)
     suites: dict[str, dict] = defaultdict(
         lambda: {
             "passed": 0,
@@ -86,6 +128,9 @@ def summarize_executions(results: list[dict]) -> tuple[dict, dict]:
         if status not in ("passed", "failed", "broken", "skipped"):
             status = "failed"
         statuses[status] += 1
+        bug = is_bug_result(result)
+        if not bug:
+            health_statuses[status] += 1
 
         suite = suite_of(result)
         suites[suite]["total"] += 1
@@ -107,8 +152,12 @@ def summarize_executions(results: list[dict]) -> tuple[dict, dict]:
     broken = statuses.get("broken", 0)
     skipped = statuses.get("skipped", 0)
     total = sum(statuses.values())
-    completed = passed + failed + broken
-    pass_rate = (passed / completed * 100.0) if completed else 0.0
+    # Pass rate excludes @Tag("bug") so known defects do not tank health metrics
+    health_passed = health_statuses.get("passed", 0)
+    health_failed = health_statuses.get("failed", 0)
+    health_broken = health_statuses.get("broken", 0)
+    health_completed = health_passed + health_failed + health_broken
+    pass_rate = (health_passed / health_completed * 100.0) if health_completed else 0.0
     avg_sec = (sum(durations_ms) / len(durations_ms) / 1000.0) if durations_ms else None
 
     api_sec = suites.get("api", {}).get("duration_sec") or 0.0
@@ -168,6 +217,42 @@ def net_new_tests_since(repo_root: Path, days: int) -> int:
     return max(added - removed, 0)
 
 
+def count_bug_tags_in_git(repo_root: Path) -> int:
+    test_root = repo_root / "src" / "test" / "java"
+    if not test_root.is_dir():
+        return 0
+    total = 0
+    for path in test_root.rglob("*Test.java"):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        total += len(BUG_TAG.findall(text))
+    return total
+
+
+def net_new_bug_tags_since(repo_root: Path, days: int) -> int:
+    try:
+        out_bytes = subprocess.check_output(
+            [
+                "git",
+                "-C",
+                str(repo_root),
+                "log",
+                f"--since={days}.days.ago",
+                "-p",
+                "--unified=0",
+                "--",
+                "src/test/java",
+            ],
+            stderr=subprocess.DEVNULL,
+        )
+        out = out_bytes.decode("utf-8", errors="replace")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return 0
+    return max(len(ADDED_BUG_TAG.findall(out)) - len(REMOVED_BUG_TAG.findall(out)), 0)
+
+
 def git_test_metrics(repo_root: Path) -> dict:
     test_root = repo_root / "src" / "test" / "java"
     total = 0
@@ -183,12 +268,16 @@ def git_test_metrics(repo_root: Path) -> dict:
             elif rel.startswith("ui/"):
                 ui_tests += count
 
+    bug_tracked = count_bug_tags_in_git(repo_root)
     return {
         "total_tests": total,
         "api_tests": api_tests,
         "ui_tests": ui_tests,
         "new_tests_7d": net_new_tests_since(repo_root, 7),
         "new_tests_30d": net_new_tests_since(repo_root, 30),
+        "bug_tests": bug_tracked,
+        "new_bug_tests_7d": net_new_bug_tags_since(repo_root, 7),
+        "new_bug_tests_30d": net_new_bug_tags_since(repo_root, 30),
     }
 
 
@@ -283,6 +372,7 @@ def main() -> int:
     results = load_results(args.results_dir)
     executions, suites = summarize_executions(results)
     git = git_test_metrics(args.repo_root)
+    defects = summarize_defects(results, git.get("bug_tests", 0))
     swagger = parse_swagger_html(args.swagger_report)
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -305,6 +395,9 @@ def main() -> int:
         "swagger_coverage_percent": swagger["coverage_percent"],
         "api_duration_sec": executions.get("api_duration_sec"),
         "ui_duration_sec": executions.get("ui_duration_sec"),
+        "defects_tracked": defects["tracked_in_git"],
+        "defects_still_reproduced": defects["still_reproduced"],
+        "new_bug_tests_7d": git.get("new_bug_tests_7d", 0),
     }
     history = append_history(history, point)
 
@@ -321,6 +414,7 @@ def main() -> int:
         "executions": executions,
         "suites": suites,
         "git": git,
+        "defects": defects,
         "swagger": swagger,
         "history": history,
     }
@@ -339,6 +433,7 @@ def main() -> int:
         f"Dashboard written to {site / 'index.html'} "
         f"(executions={executions['total']}, pass_rate={executions['pass_rate']}%, "
         f"git_tests={git['total_tests']}, new_7d={git['new_tests_7d']}, "
+        f"defects={defects['tracked_in_git']} open={defects['still_reproduced']}, "
         f"api={executions.get('api_duration_sec')}s, ui={executions.get('ui_duration_sec')}s)"
     )
     return 0
